@@ -1,0 +1,9 @@
+fastapi
+uvicorn[standard]
+sqlalchemy
+python-multipart
+azure-storage-blob
+PyPDF2
+pymssql
+python-dotenv
+razorpay

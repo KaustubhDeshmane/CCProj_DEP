@@ -1,0 +1,382 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Cloud Print Queue | Admin</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+    <style>
+        
+        :root {
+            --app-bg: rgba(255, 255, 255, 0.4);
+            --app-border: rgba(0, 0, 0, 0.1);
+            --text-main: #000000;
+            --text-muted: #000000;
+            --glass-bg: rgba(255, 255, 255, 0.6);
+            --glass-border: rgba(255, 255, 255, 0.5);
+            --card-inner: rgba(0, 0, 0, 0.05);
+            --input-bg: rgba(255, 255, 255, 0.7);
+            --input-border: rgba(0, 0, 0, 0.1);
+            --accent-glow: rgba(16, 185, 129, 0.4);
+            --btn-gradient: linear-gradient(-45deg, #10b981, #6ee7b7, #34d399, #10b981);
+            --vibrant-gradient: linear-gradient(135deg, #10b981 0%, #34d399 100%);
+            --pill-bg: rgba(0, 0, 0, 0.05);
+            --pill-glow: linear-gradient(90deg, #10b981 0%, #34d399 50%, #10b981 100%);
+            --border-glow: linear-gradient(90deg, #34d399 0%, #10b981 50%, #34d399 100%);
+            --status-text: #059669;
+            --queue-grad-1: rgba(160, 200, 180, 0.95);
+            --queue-grad-2: rgba(220, 235, 225, 0.95);
+            --done-btn-bg: rgba(16, 185, 129, 0.15);
+            --done-btn-hover: rgba(16, 185, 129, 0.25);
+            --done-btn-text: #059669;
+            --blur-decor-1: rgba(255, 255, 255, 0.8);
+            --blur-decor-2: rgba(16, 185, 129, 0.3);
+        }
+        body.theme-dark {
+            --app-bg: rgba(15, 23, 42, 0.4);
+            --app-border: rgba(255, 255, 255, 0.1);
+            --text-main: #ffffff;
+            --text-muted: rgba(255, 255, 255, 0.9);
+            --glass-bg: rgba(15, 23, 42, 0.7);
+            --glass-border: rgba(255, 255, 255, 0.05);
+            --card-inner: rgba(255, 255, 255, 0.05);
+            --input-bg: rgba(0, 0, 0, 0.2);
+            --input-border: rgba(255, 255, 255, 0.1);
+            --accent-glow: rgba(37, 99, 235, 0.5);
+            --btn-gradient: linear-gradient(-45deg, #1e3a8a, #2563eb, #60a5fa, #2563eb, #1e3a8a);
+            --vibrant-gradient: linear-gradient(135deg, #1d4ed8 0%, #3b82f6 100%);
+            --pill-bg: #0f172a;
+            --pill-glow: linear-gradient(90deg, #1d4ed8 0%, #3b82f6 50%, #1d4ed8 100%);
+            --border-glow: linear-gradient(90deg, #60a5fa 0%, #3b82f6 50%, #60a5fa 100%);
+            --status-text: #60a5fa;
+            --queue-grad-1: rgba(15, 23, 42, 0.95);
+            --queue-grad-2: rgba(30, 58, 138, 0.85);
+            --done-btn-bg: rgba(59, 130, 246, 0.15);
+            --done-btn-hover: rgba(59, 130, 246, 0.25);
+            --done-btn-text: #60a5fa;
+            --blur-decor-1: rgba(255, 255, 255, 0.05);
+            --blur-decor-2: rgba(59, 130, 246, 0.2);
+        }
+body {
+            font-family: 'Inter', sans-serif;
+            background-color: #fbfaf8;
+            background-image: 
+                radial-gradient(circle at 50% 50%, rgba(0, 223, 130, 0.8) 0%, rgba(0, 223, 130, 0) 35%),
+                radial-gradient(circle at 50% 50%, rgba(16, 185, 129, 0.7) 0%, rgba(16, 185, 129, 0) 30%),
+                radial-gradient(circle at 50% 50%, rgba(52, 211, 153, 0.9) 0%, rgba(52, 211, 153, 0) 40%),
+                radial-gradient(circle at 50% 50%, rgba(5, 150, 105, 0.6) 0%, rgba(5, 150, 105, 0) 35%);
+            background-size: 200% 200%, 250% 250%, 180% 180%, 300% 300%;
+            background-repeat: no-repeat;
+            animation: gradientBG 45s linear infinite alternate;
+            min-height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 1rem;
+            overflow-x: hidden;
+        }
+        @media (min-width: 1024px) {
+            body { padding: 2rem; }
+        }
+        body.theme-dark {
+            background-color: #0b0c10;
+            background-image: 
+                radial-gradient(circle at 50% 50%, rgba(29, 78, 216, 0.8) 0%, rgba(29, 78, 216, 0) 35%),
+                radial-gradient(circle at 50% 50%, rgba(30, 58, 138, 0.9) 0%, rgba(30, 58, 138, 0) 30%),
+                radial-gradient(circle at 50% 50%, rgba(37, 99, 235, 0.7) 0%, rgba(37, 99, 235, 0) 40%),
+                radial-gradient(circle at 50% 50%, rgba(59, 130, 246, 0.6) 0%, rgba(59, 130, 246, 0) 35%);
+        }
+        @keyframes gradientBG {
+            0%   { background-position: 0% 0%, 100% 0%, 0% 100%, 100% 100%; }
+            20%  { background-position: 25% 75%, 80% 20%, 50% 10%, 20% 90%; }
+            40%  { background-position: 80% 10%, 10% 90%, 90% 80%, 50% 30%; }
+            60%  { background-position: 50% 50%, 40% 10%, 10% 30%, 80% 10%; }
+            80%  { background-position: 90% 90%, 20% 50%, 70% 20%, 30% 60%; }
+            100% { background-position: 0% 100%, 100% 100%, 0% 0%, 100% 0%; }
+        }
+        .app-container {
+            background: var(--app-bg);
+            backdrop-filter: blur(40px);
+            -webkit-backdrop-filter: blur(40px);
+            border: 1px solid var(--app-border);
+            border-radius: 24px;
+            box-shadow: 0 30px 60px -12px rgba(0, 0, 0, 0.3);
+            width: 100%;
+            max-width: 72rem; /* Desktop width */
+            padding: 1.5rem 1.25rem;
+            color: var(--text-main);
+            position: relative;
+            overflow: hidden;
+            transition: all 0.3s ease;
+        }
+        @media (min-width: 1024px) {
+            .app-container {
+                border-radius: 40px;
+                padding: 2rem 2.5rem;
+            }
+        }
+        .glass-card {
+            background-color: var(--glass-bg);
+            border: 1px solid var(--glass-border);
+            border-radius: 24px;
+            transition: all 0.3s ease;
+        }
+        .vibrant-gradient {
+            background: var(--vibrant-gradient);
+            color: #ffffff;
+        }
+        .input-field {
+            background-color: var(--input-bg);
+            border: 1px solid var(--input-border);
+            color: var(--text-main);
+            transition: all 0.3s ease;
+        }
+        .input-field::placeholder {
+            color: var(--text-muted);
+        }
+        .input-field:focus {
+            background-color: var(--card-inner);
+            border-color: var(--status-text);
+            outline: none;
+        }
+        /* Custom scrollbar for webkit */
+        ::-webkit-scrollbar { width: 6px; }
+        ::-webkit-scrollbar-track { background: transparent; }
+        ::-webkit-scrollbar-thumb { background: var(--status-text); border-radius: 3px; }
+
+        /* Hide number spinners */
+        input[type="number"]::-webkit-inner-spin-button,
+        input[type="number"]::-webkit-outer-spin-button {
+            -webkit-appearance: none;
+            margin: 0;
+        }
+        input[type="number"] {
+            -moz-appearance: textfield;
+        }
+
+        /* Custom Animations */
+        @keyframes shimmerLine {
+            0% { background-position: 200% center; }
+            100% { background-position: 0% center; }
+        }
+        @keyframes fancyHover {
+            0% { background-position: 0% 50%; }
+            50% { background-position: 100% 50%; }
+            100% { background-position: 0% 50%; }
+        }
+
+        .animated-glow-bg {
+            background: var(--pill-glow);
+            background-size: 200% auto;
+            animation: shimmerLine 2.5s linear infinite;
+            box-shadow: 0 0 12px var(--accent-glow);
+        }
+
+        .animated-border-glow {
+            background: var(--border-glow);
+            background-size: 200% auto;
+            animation: shimmerLine 2s linear infinite;
+            box-shadow: 0 0 10px var(--accent-glow);
+        }
+
+        .btn-gradient {
+            background: var(--btn-gradient);
+            background-size: 300% auto;
+            background-position: 0% center;
+            transition: all 0.6s cubic-bezier(0.4, 0, 0.2, 1);
+            box-shadow: 0 4px 20px var(--accent-glow);
+            color: #ffffff;
+        }
+        .btn-gradient:hover {
+            background-position: 100% center;
+            box-shadow: 0 12px 35px var(--accent-glow);
+            transform: translateY(-2px);
+        }
+        .btn-gradient:active {
+            transform: scale(0.96);
+            box-shadow: 0 2px 15px var(--accent-glow);
+            filter: brightness(1.2);
+        }
+        .queue-card-bg {
+            background: linear-gradient(135deg, var(--queue-grad-1), var(--queue-grad-2), var(--queue-grad-1));
+            background-size: 200% 200%;
+            animation: gradientShift 6s ease infinite;
+        }
+        .text-muted { color: var(--text-muted); }
+        .text-main { color: var(--text-main); }
+        .text-status { color: var(--status-text); }
+        .border-app { border-color: var(--app-border); }
+        .bg-inner { background-color: var(--card-inner); }
+        .hover-bg-inner:hover { background-color: var(--input-bg); }
+        .bg-pill { background-color: var(--pill-bg); }
+        .blur-decor-1 { background-color: var(--blur-decor-1); }
+        .blur-decor-2 { background-color: var(--blur-decor-2); }
+        .done-btn {
+            background-color: var(--done-btn-bg);
+            color: var(--done-btn-text);
+            transition: all 0.3s ease;
+        }
+        .done-btn:hover {
+            background-color: var(--done-btn-hover);
+        }
+    </style>
+</head>
+<body>
+<script>
+    if (localStorage.getItem('theme') === 'light') {
+        document.body.classList.remove('theme-dark');
+    } else {
+        document.body.classList.add('theme-dark');
+    }
+</script>
+
+<div class="app-container">
+    <!-- Header -->
+    <header class="flex justify-between items-center mb-10 px-2 shrink-0">
+        <div class="flex items-center gap-6">
+            <a href="/" class="w-10 h-10 rounded-full bg-inner flex items-center justify-center text-muted hover:text-main hover-bg-inner transition-all">
+                <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7"></path></svg>
+            </a>
+            <h1 class="text-2xl font-black tracking-tight">Admin Dashboard</h1>
+        </div>
+        <div class="flex items-center gap-4">
+            <button id="themeToggle" class="w-16 h-10 rounded-full bg-[#fde047] [.theme-dark_&]:bg-[#7dd3fc] shadow-inner border border-app flex items-center px-1 cursor-pointer transition-colors relative focus:outline-none" title="Toggle Dark/Light Mode">
+                <div class="w-8 h-8 rounded-full shadow-md transition-all duration-300 transform translate-x-0 [.theme-dark_&]:translate-x-6 z-10 relative overflow-hidden bg-[#fef08a] [.theme-dark_&]:bg-[#bae6fd]">
+                    <div class="absolute inset-0 flex items-center justify-center transition-opacity duration-300 opacity-100 [.theme-dark_&]:opacity-0 text-base leading-none">☀️</div>
+                    <div class="absolute inset-0 flex items-center justify-center transition-opacity duration-300 opacity-0 [.theme-dark_&]:opacity-100 text-base leading-none pb-[1px]">🌙</div>
+                </div>
+            </button>
+        </div>
+    </header>
+
+    <div class="grid grid-cols-1 lg:grid-cols-12 gap-10 flex-grow min-h-0">
+        <!-- Left Sidebar -->
+        <div class="lg:col-span-4 flex flex-col gap-6">
+            <!-- Revenue Gradient Card -->
+            <div class="vibrant-gradient rounded-[32px] p-8 shrink-0 relative overflow-hidden shadow-[0_15px_40px_var(--accent-glow)]">
+                <div class="relative z-10 flex flex-col items-start">
+                    <span class="text-xs uppercase tracking-widest opacity-80 mb-2 font-bold">Total Revenue</span>
+                    <div class="flex items-baseline gap-2 mb-2">
+                        <span id="revenueAmount" class="text-4xl md:text-5xl lg:text-6xl font-black">₹0</span>
+                    </div>
+                    <p id="liveClock" class="text-xs opacity-70 font-medium mt-2"></p>
+                </div>
+                <div class="absolute -bottom-10 -right-10 w-48 h-48 blur-decor-1 rounded-full opacity-20 blur-[40px]"></div>
+                <div class="absolute -top-10 -left-10 w-24 h-24 blur-decor-2 rounded-full opacity-30 blur-[30px]"></div>
+            </div>
+
+            <div class="glass-card p-6 flex-grow flex items-center justify-center border border-app shadow-lg">
+                 <p class="text-sm opacity-50 text-center font-medium">Additional analytics<br>coming soon...</p>
+            </div>
+        </div>
+
+        <!-- Right Side: Queue -->
+        <div class="lg:col-span-8 flex flex-col min-h-0">
+            <div class="flex items-center justify-between mb-6 px-2 shrink-0">
+                <h2 class="text-xl font-bold opacity-90">Pending Jobs</h2>
+                <span class="text-sm font-bold opacity-80 px-4 py-1.5 bg-inner rounded-full shadow-inner" id="queueListCount">0 jobs</span>
+            </div>
+            
+            <div class="scrollable-area space-y-4" id="queueList">
+                <!-- JS populated items will go here -->
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+    const API_BASE_URL = window.location.origin;
+
+    document.getElementById('themeToggle').addEventListener('click', () => {
+        document.body.classList.toggle('theme-dark');
+        if (document.body.classList.contains('theme-dark')) {
+            localStorage.setItem('theme', 'dark');
+        } else {
+            localStorage.setItem('theme', 'light');
+        }
+    });
+
+    function updateClock() {
+        const options = { timeZone: 'Asia/Kolkata', hour: '2-digit', minute: '2-digit', hour12: true };
+        document.getElementById('liveClock').textContent = 'Last updated: ' + new Date().toLocaleTimeString('en-IN', options);
+    }
+    setInterval(updateClock, 1000);
+    updateClock();
+
+    async function fetchQueue() {
+        try {
+            const res = await fetch(`${API_BASE_URL}/queue`, { cache: 'no-store' });
+            const jobs = await res.json();
+            renderQueue(jobs);
+        } catch (err) { console.warn("Fetch failed"); }
+    }
+
+    function renderQueue(jobs) {
+        const list = document.getElementById('queueList');
+        const countBadge = document.getElementById('queueListCount');
+        
+        list.innerHTML = '';
+        countBadge.textContent = `${jobs.length} jobs`;
+        let totalRev = 0;
+
+        if (jobs.length === 0) {
+            list.innerHTML = '<div class="text-center text-sm opacity-50 mt-20 font-medium">No jobs currently in the queue.</div>';
+        }
+
+        jobs.forEach(job => {
+            totalRev += (job.total_cost || 0);
+            const fileName = job.file_url.split('/').pop();
+            
+            const dateObj = new Date(job.timestamp);
+            const timeIST = dateObj.toLocaleTimeString('en-IN', {
+                hour: '2-digit',
+                minute: '2-digit',
+                hour12: true
+            });
+
+            const s = job.page_settings;
+            const color = s.color || "B&W";
+            const copies = s.copies || 1;
+            const size = s.size || "A4";
+            const sides = s.sides || "Single";
+            const displayCost = job.total_cost !== undefined ? job.total_cost : 0;
+
+            const div = document.createElement('div');
+            div.className = "glass-card p-5 flex items-center justify-between group shadow-md transition-transform hover:-translate-y-0.5";
+
+            div.innerHTML = `
+                <div class="flex items-center gap-5">
+                    <div class="w-14 h-14 rounded-2xl bg-inner flex items-center justify-center text-2xl shrink-0 shadow-inner">
+                        📄
+                    </div>
+                    <div>
+                        <div class="font-bold text-base leading-tight">${job.user_name}</div>
+                        <div class="text-xs opacity-70 mt-1 font-medium">${job.roll_number} <span class="opacity-50 mx-1">•</span> ${size} <span class="opacity-50 mx-1">•</span> ${color} <span class="opacity-50 mx-1">•</span> ${sides} <span class="opacity-50 mx-1">•</span> x${copies}</div>
+                        <div class="text-[10px] opacity-50 mt-1 uppercase tracking-wider font-bold">${timeIST}</div>
+                    </div>
+                </div>
+                <div class="flex flex-col items-end gap-3">
+                    <span class="font-black text-lg text-status">₹${displayCost}</span>
+                    <div class="flex gap-2 opacity-100 sm:opacity-0 sm:group-hover:opacity-100 transition-opacity">
+                        <a href="${job.file_url}" target="_blank" class="px-4 py-1.5 bg-inner hover-bg-inner rounded-lg text-xs font-bold transition-colors">VIEW</a>
+                        <button onclick="markDone(${job.id})" class="px-4 py-1.5 bg-[#f72585]/20 hover:bg-[#f72585]/40 text-status rounded-lg text-xs font-bold transition-colors shadow-sm">DONE</button>
+                    </div>
+                </div>
+            `;
+            list.appendChild(div);
+        });
+        document.getElementById('revenueAmount').textContent = `₹${totalRev}`;
+    }
+
+    async function markDone(id) {
+        if (!confirm("Is printing completed?")) return;
+        await fetch(`${API_BASE_URL}/complete/${id}`, { method: 'PATCH' });
+        fetchQueue();
+    }
+
+    fetchQueue();
+    setInterval(fetchQueue, 5000);
+</script>
+</body>
+</html>

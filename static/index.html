@@ -1,0 +1,603 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Cloud Print Queue</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://unpkg.com/pdf-lib/dist/pdf-lib.min.js"></script>
+    <script src="https://checkout.razorpay.com/v1/checkout.js"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+    <style>
+        
+        :root {
+            --app-bg: rgba(255, 255, 255, 0.4);
+            --app-border: rgba(0, 0, 0, 0.1);
+            --text-main: #000000;
+            --text-muted: #000000;
+            --glass-bg: rgba(255, 255, 255, 0.6);
+            --glass-border: rgba(255, 255, 255, 0.5);
+            --card-inner: rgba(0, 0, 0, 0.05);
+            --input-bg: rgba(255, 255, 255, 0.7);
+            --input-border: rgba(0, 0, 0, 0.1);
+            --accent-glow: rgba(16, 185, 129, 0.4);
+            --btn-gradient: linear-gradient(-45deg, #10b981, #6ee7b7, #34d399, #10b981);
+            --vibrant-gradient: linear-gradient(135deg, #10b981 0%, #34d399 100%);
+            --pill-bg: rgba(0, 0, 0, 0.05);
+            --pill-glow: linear-gradient(90deg, #10b981 0%, #34d399 50%, #10b981 100%);
+            --border-glow: linear-gradient(90deg, #34d399 0%, #10b981 50%, #34d399 100%);
+            --status-text: #059669;
+            --queue-grad-1: rgba(160, 200, 180, 0.95);
+            --queue-grad-2: rgba(220, 235, 225, 0.95);
+            --done-btn-bg: rgba(16, 185, 129, 0.15);
+            --done-btn-hover: rgba(16, 185, 129, 0.25);
+            --done-btn-text: #059669;
+            --blur-decor-1: rgba(255, 255, 255, 0.8);
+            --blur-decor-2: rgba(16, 185, 129, 0.3);
+        }
+        body.theme-dark {
+            --app-bg: rgba(15, 23, 42, 0.4);
+            --app-border: rgba(255, 255, 255, 0.1);
+            --text-main: #ffffff;
+            --text-muted: rgba(255, 255, 255, 0.9);
+            --glass-bg: rgba(15, 23, 42, 0.7);
+            --glass-border: rgba(255, 255, 255, 0.05);
+            --card-inner: rgba(255, 255, 255, 0.05);
+            --input-bg: rgba(0, 0, 0, 0.2);
+            --input-border: rgba(255, 255, 255, 0.1);
+            --accent-glow: rgba(37, 99, 235, 0.5);
+            --btn-gradient: linear-gradient(-45deg, #1e3a8a, #2563eb, #60a5fa, #2563eb, #1e3a8a);
+            --vibrant-gradient: linear-gradient(135deg, #1d4ed8 0%, #3b82f6 100%);
+            --pill-bg: #0f172a;
+            --pill-glow: linear-gradient(90deg, #1d4ed8 0%, #3b82f6 50%, #1d4ed8 100%);
+            --border-glow: linear-gradient(90deg, #60a5fa 0%, #3b82f6 50%, #60a5fa 100%);
+            --status-text: #60a5fa;
+            --queue-grad-1: rgba(15, 23, 42, 0.95);
+            --queue-grad-2: rgba(30, 58, 138, 0.85);
+            --done-btn-bg: rgba(59, 130, 246, 0.15);
+            --done-btn-hover: rgba(59, 130, 246, 0.25);
+            --done-btn-text: #60a5fa;
+            --blur-decor-1: rgba(255, 255, 255, 0.05);
+            --blur-decor-2: rgba(59, 130, 246, 0.2);
+        }
+body {
+            font-family: 'Inter', sans-serif;
+            background-color: #fbfaf8;
+            background-image: 
+                radial-gradient(circle at 50% 50%, rgba(0, 223, 130, 0.8) 0%, rgba(0, 223, 130, 0) 35%),
+                radial-gradient(circle at 50% 50%, rgba(16, 185, 129, 0.7) 0%, rgba(16, 185, 129, 0) 30%),
+                radial-gradient(circle at 50% 50%, rgba(52, 211, 153, 0.9) 0%, rgba(52, 211, 153, 0) 40%),
+                radial-gradient(circle at 50% 50%, rgba(5, 150, 105, 0.6) 0%, rgba(5, 150, 105, 0) 35%);
+            background-size: 200% 200%, 250% 250%, 180% 180%, 300% 300%;
+            background-repeat: no-repeat;
+            animation: gradientBG 45s linear infinite alternate;
+            min-height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 1rem;
+            overflow-x: hidden;
+        }
+        @media (min-width: 1024px) {
+            body { padding: 2rem; }
+        }
+        body.theme-dark {
+            background-color: #0b0c10;
+            background-image: 
+                radial-gradient(circle at 50% 50%, rgba(29, 78, 216, 0.8) 0%, rgba(29, 78, 216, 0) 35%),
+                radial-gradient(circle at 50% 50%, rgba(30, 58, 138, 0.9) 0%, rgba(30, 58, 138, 0) 30%),
+                radial-gradient(circle at 50% 50%, rgba(37, 99, 235, 0.7) 0%, rgba(37, 99, 235, 0) 40%),
+                radial-gradient(circle at 50% 50%, rgba(59, 130, 246, 0.6) 0%, rgba(59, 130, 246, 0) 35%);
+        }
+        @keyframes gradientBG {
+            0%   { background-position: 0% 0%, 100% 0%, 0% 100%, 100% 100%; }
+            20%  { background-position: 25% 75%, 80% 20%, 50% 10%, 20% 90%; }
+            40%  { background-position: 80% 10%, 10% 90%, 90% 80%, 50% 30%; }
+            60%  { background-position: 50% 50%, 40% 10%, 10% 30%, 80% 10%; }
+            80%  { background-position: 90% 90%, 20% 50%, 70% 20%, 30% 60%; }
+            100% { background-position: 0% 100%, 100% 100%, 0% 0%, 100% 0%; }
+        }
+        @keyframes gradientShift {
+            0% { background-position: 0% 50%; }
+            50% { background-position: 100% 50%; }
+            100% { background-position: 0% 50%; }
+        }
+        .animate-bg-shift {
+            background-size: 400% 400%;
+            animation: gradientShift 6s ease infinite;
+        }
+        .app-container {
+            background: var(--app-bg);
+            backdrop-filter: blur(40px);
+            -webkit-backdrop-filter: blur(40px);
+            border: 1px solid var(--app-border);
+            border-radius: 24px;
+            box-shadow: 0 30px 60px -12px rgba(0, 0, 0, 0.3);
+            width: 100%;
+            max-width: 72rem; /* Desktop width */
+            padding: 1.5rem 1.25rem;
+            color: var(--text-main);
+            position: relative;
+            overflow: hidden;
+            transition: all 0.3s ease;
+        }
+        @media (min-width: 1024px) {
+            .app-container {
+                border-radius: 40px;
+                padding: 2rem 2.5rem;
+            }
+        }
+        .glass-card {
+            background-color: var(--glass-bg);
+            border: 1px solid var(--glass-border);
+            border-radius: 24px;
+            transition: all 0.3s ease;
+        }
+        .vibrant-gradient {
+            background: var(--vibrant-gradient);
+            color: #ffffff;
+        }
+        .input-field {
+            background-color: var(--input-bg);
+            border: 1px solid var(--input-border);
+            color: var(--text-main);
+            transition: all 0.3s ease;
+        }
+        .input-field::placeholder {
+            color: var(--text-muted);
+        }
+        .input-field:focus {
+            background-color: var(--card-inner);
+            border-color: var(--status-text);
+            outline: none;
+        }
+        /* Custom scrollbar for webkit */
+        ::-webkit-scrollbar { width: 6px; }
+        ::-webkit-scrollbar-track { background: transparent; }
+        ::-webkit-scrollbar-thumb { background: var(--status-text); border-radius: 3px; }
+
+        /* Hide number spinners */
+        input[type="number"]::-webkit-inner-spin-button,
+        input[type="number"]::-webkit-outer-spin-button {
+            -webkit-appearance: none;
+            margin: 0;
+        }
+        input[type="number"] {
+            -moz-appearance: textfield;
+        }
+
+        /* Custom Animations */
+        @keyframes shimmerLine {
+            0% { background-position: 200% center; }
+            100% { background-position: 0% center; }
+        }
+        @keyframes fancyHover {
+            0% { background-position: 0% 50%; }
+            50% { background-position: 100% 50%; }
+            100% { background-position: 0% 50%; }
+        }
+
+        .animated-glow-bg {
+            background: var(--pill-glow);
+            background-size: 200% auto;
+            animation: shimmerLine 2.5s linear infinite;
+            box-shadow: 0 0 12px var(--accent-glow);
+        }
+
+        .animated-border-glow {
+            background: var(--border-glow);
+            background-size: 200% auto;
+            animation: shimmerLine 2s linear infinite;
+            box-shadow: 0 0 10px var(--accent-glow);
+        }
+
+        .btn-gradient {
+            background: var(--btn-gradient);
+            background-size: 300% auto;
+            background-position: 0% center;
+            transition: all 0.6s cubic-bezier(0.4, 0, 0.2, 1);
+            box-shadow: 0 4px 20px var(--accent-glow);
+            color: #ffffff;
+        }
+        .btn-gradient:hover {
+            background-position: 100% center;
+            box-shadow: 0 12px 35px var(--accent-glow);
+            transform: translateY(-2px);
+        }
+        .btn-gradient:active {
+            transform: scale(0.96);
+            box-shadow: 0 2px 15px var(--accent-glow);
+            filter: brightness(1.2);
+        }
+        .queue-card-bg {
+            background: linear-gradient(135deg, var(--queue-grad-1), var(--queue-grad-2), var(--queue-grad-1));
+            background-size: 200% 200%;
+            animation: gradientShift 6s ease infinite;
+        }
+        .text-muted { color: var(--text-muted); }
+        .text-main { color: var(--text-main); }
+        .text-status { color: var(--status-text); }
+        .border-app { border-color: var(--app-border); }
+        .bg-inner { background-color: var(--card-inner); }
+        .hover-bg-inner:hover { background-color: var(--input-bg); }
+        .bg-pill { background-color: var(--pill-bg); }
+        .blur-decor-1 { background-color: var(--blur-decor-1); }
+        .blur-decor-2 { background-color: var(--blur-decor-2); }
+        .done-btn {
+            background-color: var(--done-btn-bg);
+            color: var(--done-btn-text);
+            transition: all 0.3s ease;
+        }
+        .done-btn:hover {
+            background-color: var(--done-btn-hover);
+        }
+    </style>
+</head>
+<body>
+<script>
+    if (localStorage.getItem('theme') === 'light') {
+        document.body.classList.remove('theme-dark');
+    } else {
+        document.body.classList.add('theme-dark');
+    }
+</script>
+
+<div id="successToast" class="fixed top-5 right-5 hidden bg-emerald-500 text-main px-6 py-4 rounded-2xl shadow-2xl z-50 transition-all">
+    ✅ Print Job Submitted!
+</div>
+
+<div class="app-container">
+    <!-- Header -->
+    <header class="flex justify-between items-start mb-6 px-2">
+        <div>
+            <h1 class="text-2xl font-black tracking-tight">Cloud Print</h1>
+            <p id="liveClock" class="text-xs opacity-60 font-medium mt-1"></p>
+        </div>
+        <div class="flex items-center gap-4">
+            <button id="themeToggle" class="w-16 h-10 rounded-full bg-[#fde047] [.theme-dark_&]:bg-[#7dd3fc] shadow-inner border border-app flex items-center px-1 cursor-pointer transition-colors relative focus:outline-none" title="Toggle Dark/Light Mode">
+                <div class="w-8 h-8 rounded-full shadow-md transition-all duration-300 transform translate-x-0 [.theme-dark_&]:translate-x-6 z-10 relative overflow-hidden bg-[#fef08a] [.theme-dark_&]:bg-[#bae6fd]">
+                    <div class="absolute inset-0 flex items-center justify-center transition-opacity duration-300 opacity-100 [.theme-dark_&]:opacity-0 text-base leading-none">☀️</div>
+                    <div class="absolute inset-0 flex items-center justify-center transition-opacity duration-300 opacity-0 [.theme-dark_&]:opacity-100 text-base leading-none pb-[1px]">🌙</div>
+                </div>
+            </button>
+            <div class="w-10 h-10 rounded-full vibrant-gradient flex items-center justify-center font-bold text-base shadow-[0_0_20px_var(--accent-glow)]">
+                ClPr
+            </div>
+        </div>
+    </header>
+
+    <div class="grid grid-cols-1 lg:grid-cols-12 gap-8">
+        <!-- Left Side: Queue Status -->
+        <div class="lg:col-span-5 flex flex-col h-full">
+            <div class="glass-card rounded-[2rem] p-10 flex flex-col justify-center items-start text-main relative overflow-hidden group shadow-2xl h-full border border-app queue-card-bg min-h-[400px]">
+                <div class="relative z-10 flex flex-col items-start text-left w-full">
+                    <h2 class="text-xl font-bold mb-2 tracking-widest text-status">QUEUE STATUS</h2>
+                    <div class="flex items-baseline gap-3 mb-4">
+                        <span id="queueCount" class="text-5xl lg:text-6xl font-black">0</span>
+                        <span class="text-lg opacity-90 font-medium">Jobs Ahead</span>
+                    </div>
+                    
+                    <div class="bg-inner inline-flex px-4 py-2 rounded-xl mb-4 border border-app items-center gap-2 shadow-inner">
+                        <svg class="w-4 h-4 opacity-80" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
+                        <span class="text-sm font-semibold opacity-90" id="waitTimeDisplay">Wait Time: Calculating...</span>
+                    </div>
+                    
+                    <p class="text-xs opacity-80 max-w-[250px] leading-relaxed font-medium">Your print job will be added to this queue and processed in the exact order it was received.</p>
+                </div>
+                <!-- Decorative blur elements -->
+                <div class="absolute -bottom-20 -right-20 w-64 h-64 blur-decor-1 rounded-full opacity-20 blur-[50px]"></div>
+                <div class="absolute -top-10 -left-10 w-32 h-32 blur-decor-2 rounded-full opacity-30 blur-[40px]"></div>
+            </div>
+        </div>
+
+        <!-- Right Side: Create New Job Form -->
+        <div class="lg:col-span-7 flex flex-col">
+            <div class="flex items-center mb-4 px-2">
+                <h2 class="text-lg font-bold opacity-90">New Print Job</h2>
+            </div>
+            
+            <form id="uploadForm" class="space-y-4">
+                <div class="glass-card p-5 space-y-3 shadow-lg">
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-3">
+                        <input type="text" id="userName" required placeholder="Student Name" class="input-field w-full rounded-xl px-4 py-3 text-sm transition-all  font-medium">
+                        <input type="text" id="rollNumber" required placeholder="Roll Number" class="input-field w-full rounded-xl px-4 py-3 text-sm transition-all  font-medium">
+                    </div>
+                    
+                    <div id="dropZone" class="input-field border-dashed rounded-xl p-5 text-center cursor-pointer hover-bg-inner transition-all flex flex-col items-center justify-center gap-2">
+                        <svg class="w-6 h-6 opacity-60" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12"></path></svg>
+                        <p id="fileNameDisplay" class="text-xs opacity-60 font-medium">Tap to select document</p>
+                        <input type="file" id="fileInput" class="hidden" accept=".pdf,.doc,.docx,.jpg,.png">
+                    </div>
+                </div>
+
+                <div class="glass-card p-5 flex flex-col gap-4 shadow-lg">
+                    <div class="flex justify-between items-center">
+                        <span class="text-sm font-semibold opacity-80">Color Mode</span>
+                        <div class="relative flex bg-pill rounded-xl p-1 w-[160px]">
+                            <!-- Sliding Pill -->
+                            <div class="absolute inset-y-1 left-1 w-[calc(50%-4px)] animated-glow-bg rounded-lg transition-transform duration-300 ease-[cubic-bezier(0.4,0,0.2,1)]" id="pill-colorMode"></div>
+                            
+                            <label class="flex-1 text-center relative z-10 cursor-pointer">
+                                <input type="radio" name="colorMode" value="B&W" checked onchange="calculateUIEstimate(); document.getElementById('pill-colorMode').style.transform='translateX(0)'" class="hidden peer">
+                                <span class="block py-2 text-[11px] font-bold text-muted peer-checked:text-main transition-colors">B&W (₹1)</span>
+                            </label>
+                            <label class="flex-1 text-center relative z-10 cursor-pointer">
+                                <input type="radio" name="colorMode" value="Color" onchange="calculateUIEstimate(); document.getElementById('pill-colorMode').style.transform='translateX(100%)'" class="hidden peer">
+                                <span class="block py-2 text-[11px] font-bold text-muted peer-checked:text-main transition-colors">Color (₹10)</span>
+                            </label>
+                        </div>
+                    </div>
+                    
+                    <div class="flex justify-between items-center">
+                        <span class="text-sm font-semibold opacity-80">Paper Size</span>
+                        <div class="relative flex bg-pill rounded-xl p-1 w-[160px]">
+                            <div class="absolute inset-y-1 left-1 w-[calc(50%-4px)] animated-glow-bg rounded-lg transition-transform duration-300 ease-[cubic-bezier(0.4,0,0.2,1)]" id="pill-paperSize"></div>
+                            
+                            <label class="flex-1 text-center relative z-10 cursor-pointer">
+                                <input type="radio" name="paperSize" value="A4" checked onchange="calculateUIEstimate(); document.getElementById('pill-paperSize').style.transform='translateX(0)'" class="hidden peer">
+                                <span class="block py-2 text-xs font-bold text-muted peer-checked:text-main transition-colors">A4</span>
+                            </label>
+                            <label class="flex-1 text-center relative z-10 cursor-pointer">
+                                <input type="radio" name="paperSize" value="A3" onchange="calculateUIEstimate(); document.getElementById('pill-paperSize').style.transform='translateX(100%)'" class="hidden peer">
+                                <span class="block py-2 text-xs font-bold text-muted peer-checked:text-main transition-colors">A3</span>
+                            </label>
+                        </div>
+                    </div>
+                    
+                    <div class="flex justify-between items-center">
+                        <span class="text-sm font-semibold opacity-80">Sides</span>
+                        <div class="relative flex bg-pill rounded-xl p-1 w-[160px]">
+                            <div class="absolute inset-y-1 left-1 w-[calc(50%-4px)] animated-glow-bg rounded-lg transition-transform duration-300 ease-[cubic-bezier(0.4,0,0.2,1)]" id="pill-sides"></div>
+                            
+                            <label class="flex-1 text-center relative z-10 cursor-pointer">
+                                <input type="radio" name="sides" value="Single" checked onchange="calculateUIEstimate(); document.getElementById('pill-sides').style.transform='translateX(0)'" class="hidden peer">
+                                <span class="block py-2 text-xs font-bold text-muted peer-checked:text-main transition-colors">Single</span>
+                            </label>
+                            <label class="flex-1 text-center relative z-10 cursor-pointer">
+                                <input type="radio" name="sides" value="Double" onchange="calculateUIEstimate(); document.getElementById('pill-sides').style.transform='translateX(100%)'" class="hidden peer">
+                                <span class="block py-2 text-xs font-bold text-muted peer-checked:text-main transition-colors">Double</span>
+                            </label>
+                        </div>
+                    </div>
+
+                    <div class="flex justify-between items-center">
+                        <span class="text-sm font-semibold opacity-80">Copies</span>
+                        <div class="relative w-16">
+                            <input type="number" id="copiesOption" value="1" min="1" class="peer w-full bg-transparent border-0 border-b-2 border-app text-center text-lg font-black text-main outline-none transition-colors pb-1 relative z-10 focus:border-transparent" oninput="calculateUIEstimate()">
+                            <!-- Glowing animated line -->
+                            <div class="absolute bottom-0 left-0 w-full h-[2px] animated-border-glow opacity-0 peer-focus:opacity-100 transition-opacity z-0 rounded-full"></div>
+                        </div>
+                    </div>
+                    
+                    <div class="flex justify-between items-center pt-3 border-t border-app mt-1">
+                        <div class="flex flex-col">
+                            <span class="text-sm font-bold opacity-70">Estimated Total</span>
+                            <span class="text-[10px] opacity-50 font-bold tracking-wider mt-0.5">PRINT TIME: <span id="uiTimeEstimate">< 1 MIN</span></span>
+                        </div>
+                        <span id="uiCostEstimate" class="text-2xl font-black text-status">₹0</span>
+                    </div>
+                </div>
+
+                <button type="submit" id="submitBtn" class="w-full btn-gradient text-main font-bold py-3.5 rounded-xl mt-3 text-sm tracking-wide">
+                    Submit Print Job
+                </button>
+            </form>
+        </div>
+    </div>
+</div>
+
+<script>
+    const API_BASE_URL = window.location.origin;
+    let selectedFile = null;
+    let selectedFilePageCount = 1;
+
+    document.getElementById('themeToggle').addEventListener('click', () => {
+        document.body.classList.toggle('theme-dark');
+        if (document.body.classList.contains('theme-dark')) {
+            localStorage.setItem('theme', 'dark');
+        } else {
+            localStorage.setItem('theme', 'light');
+        }
+    });
+
+    function updateClock() {
+        const options = { timeZone: 'Asia/Kolkata', hour: '2-digit', minute: '2-digit', hour12: true };
+        document.getElementById('liveClock').textContent = new Date().toLocaleTimeString('en-IN', options);
+    }
+    setInterval(updateClock, 1000);
+    updateClock();
+
+    const fileInput = document.getElementById('fileInput');
+    const fileNameDisplay = document.getElementById('fileNameDisplay');
+    document.getElementById('dropZone').addEventListener('click', () => fileInput.click());
+    
+    fileInput.addEventListener('change', async (e) => {
+        selectedFile = e.target.files[0];
+        if (selectedFile) {
+            const name = selectedFile.name;
+            fileNameDisplay.textContent = name.length > 35 ? name.substring(0, 32) + '...' : name;
+            fileNameDisplay.classList.remove('opacity-60');
+            fileNameDisplay.classList.add('opacity-100', 'font-bold', 'text-emerald-300');
+            
+            // Default to 1 page for images/docs, attempt to read actual pages for PDFs
+            selectedFilePageCount = 1; 
+            
+            if (selectedFile.type === 'application/pdf' || name.toLowerCase().endsWith('.pdf')) {
+                document.getElementById('uiCostEstimate').textContent = "Counting...";
+                try {
+                    const arrayBuffer = await selectedFile.arrayBuffer();
+                    const pdfDoc = await PDFLib.PDFDocument.load(arrayBuffer, { ignoreEncryption: true });
+                    selectedFilePageCount = pdfDoc.getPageCount();
+                } catch (err) {
+                    console.error("Could not parse PDF page count:", err);
+                }
+            }
+            
+            calculateUIEstimate();
+        }
+    });
+
+    function calculateUIEstimate() {
+        const copies = parseInt(document.getElementById('copiesOption').value) || 1;
+        const colorMode = document.querySelector('input[name="colorMode"]:checked').value;
+        const paperSize = document.querySelector('input[name="paperSize"]:checked').value;
+        const sides = document.querySelector('input[name="sides"]:checked').value;
+        
+        // --- Calculate Cost ---
+        const rate = (colorMode === "Color") ? 10 : 1;
+        const sizeMultiplier = (paperSize === "A3") ? 2 : 1;
+        const totalEstimate = rate * sizeMultiplier * copies * selectedFilePageCount;
+        
+        // --- Calculate Individual Job Time ---
+        let timePerPage = 2; // base
+        if (colorMode === "Color") timePerPage += 2;
+        if (paperSize === "A3") timePerPage += 3;
+        if (sides === "Double") timePerPage += 3;
+        
+        const durationSecs = 5 + (selectedFilePageCount * copies * timePerPage);
+        let timeStr = "< 1 MIN";
+        if (durationSecs >= 60) {
+            timeStr = `~ ${Math.floor(durationSecs / 60)} MINS`;
+        }
+        
+        document.getElementById('uiCostEstimate').textContent = `₹${totalEstimate}`;
+        document.getElementById('uiTimeEstimate').textContent = timeStr;
+    }
+
+    document.getElementById('uploadForm').addEventListener('submit', async (e) => {
+        e.preventDefault();
+        
+        if (!selectedFile) {
+            alert('Please select a document first.');
+            return;
+        }
+
+        const btn = document.getElementById('submitBtn');
+        const originalText = btn.innerHTML;
+        btn.innerHTML = '<span class="animate-pulse flex items-center justify-center gap-2"><svg class="animate-spin h-4 w-4" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path></svg> Processing...</span>';
+        btn.disabled = true;
+
+        const name = document.getElementById('userName').value;
+        const roll = document.getElementById('rollNumber').value;
+        
+        const settings = {
+            color: document.querySelector('input[name="colorMode"]:checked').value,
+            copies: parseInt(document.getElementById('copiesOption').value) || 1,
+            size: document.querySelector('input[name="paperSize"]:checked').value,
+            sides: document.querySelector('input[name="sides"]:checked').value,
+            pageCount: selectedFilePageCount,
+            timestamp_ms: Date.now()
+        };
+
+        const rate = (settings.color === "Color") ? 10 : 1;
+        const sizeMultiplier = (settings.size === "A3") ? 2 : 1;
+        const totalEstimate = rate * sizeMultiplier * settings.copies * selectedFilePageCount;
+
+        try {
+            const orderRes = await fetch(`${API_BASE_URL}/create-order`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ amount: totalEstimate })
+            });
+            
+            if (!orderRes.ok) throw new Error("Failed to create order");
+            const orderData = await orderRes.json();
+            
+            const rzpOptions = {
+                key: "rzp_test_St6Y030jGI531w",
+                amount: totalEstimate * 100,
+                currency: "INR",
+                name: "Cloud Print",
+                description: "Print Job Payment",
+                order_id: orderData.order_id,
+                handler: async function (response) {
+                    btn.innerHTML = '<span class="animate-pulse">Uploading to Cloud...</span>';
+                    
+                    const formData = new FormData();
+                    formData.append('name', name);
+                    formData.append('roll', roll);
+                    formData.append('options', JSON.stringify(settings));
+                    formData.append('file', selectedFile);
+                    formData.append('razorpay_payment_id', response.razorpay_payment_id);
+                    formData.append('razorpay_order_id', response.razorpay_order_id);
+                    formData.append('razorpay_signature', response.razorpay_signature);
+
+                    const uploadRes = await fetch(`${API_BASE_URL}/upload`, { method: 'POST', body: formData });
+                    
+                    if (uploadRes.ok) {
+                        const toast = document.getElementById('successToast');
+                        if (toast) toast.classList.remove('hidden');
+                        setTimeout(() => { if (toast) toast.classList.add('hidden') }, 3000);
+                        
+                        e.target.reset();
+                        selectedFile = null;
+                        selectedFilePageCount = 1;
+                        document.getElementById('fileNameDisplay').textContent = "Tap to select document";
+                        document.getElementById('fileNameDisplay').classList.add('opacity-60');
+                        document.getElementById('fileNameDisplay').classList.remove('opacity-100', 'font-bold', 'text-emerald-300');
+                        calculateUIEstimate();
+                        fetchQueueCount();
+                    } else {
+                        alert("Upload failed. Please contact admin with Payment ID: " + response.razorpay_payment_id);
+                    }
+                    
+                    btn.innerHTML = originalText;
+                    btn.disabled = false;
+                },
+                prefill: { name: name },
+                theme: { color: "#f72585" },
+                modal: {
+                    ondismiss: function() {
+                        btn.innerHTML = originalText;
+                        btn.disabled = false;
+                    }
+                }
+            };
+            
+            const rzp = new Razorpay(rzpOptions);
+            rzp.on('payment.failed', function (response){
+                alert("Payment Failed: " + response.error.description);
+                btn.innerHTML = originalText;
+                btn.disabled = false;
+            });
+            rzp.open();
+            
+        } catch (error) {
+            console.error(error);
+            alert("Error preparing checkout. Please try again.");
+            btn.innerHTML = originalText;
+            btn.disabled = false;
+        }
+    });
+
+    async function fetchQueueCount() {
+        try {
+            const res = await fetch(`${API_BASE_URL}/queue/status`, { cache: 'no-store' });
+            const data = await res.json();
+            document.getElementById('queueCount').textContent = data.count;
+            
+            // Format queue wait time
+            const seconds = data.estimated_wait_seconds || 0;
+            let timeStr = "No wait time";
+            if (seconds > 0) {
+                if (seconds < 60) timeStr = "Under 1 min";
+                else {
+                    const mins = Math.floor(seconds / 60);
+                    const hrs = Math.floor(mins / 60);
+                    if (hrs > 0) {
+                        timeStr = `~ ${hrs} hr ${mins % 60} mins`;
+                    } else {
+                        timeStr = `~ ${mins} mins`;
+                    }
+                }
+            }
+            document.getElementById('waitTimeDisplay').textContent = `Wait Time: ${timeStr}`;
+            
+        } catch (err) { console.warn("Fetch failed"); }
+    }
+
+    fetchQueueCount();
+    setInterval(fetchQueueCount, 5000);
+</script>
+</body>
+</html>

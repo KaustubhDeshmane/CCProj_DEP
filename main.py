@@ -11,10 +11,10 @@ import json
 import uuid
 from datetime import datetime, timedelta, timezone
 
-from dotenv import load_dotenv
-from azure.storage.blob import BlobServiceClient, generate_blob_sas, BlobSasPermissions, ContentSettings
 from fastapi.responses import FileResponse, RedirectResponse
-from fastapi import Request
+from fastapi import Request, Header
+from google.oauth2 import id_token
+from google.auth.transport import requests as google_requests
 import requests
 import base64
 import hashlib
@@ -22,6 +22,11 @@ from pydantic import BaseModel
 
 from database import engine, get_db
 import models, schemas
+
+# =========================
+# GOOGLE AUTH SETUP
+# =========================
+GOOGLE_CLIENT_ID = os.getenv("GOOGLE_CLIENT_ID")
 
 # =========================
 # DATABASE INITIALIZATION
@@ -133,12 +138,30 @@ def admin_page():
 @app.post("/upload-pending")
 async def upload_pending(
     request: Request,
-    name: str = Form(...),
-    roll: str = Form(...),
+    authorization: str = Header(None),
     settings: str = Form(...),
     file: UploadFile = File(...),
     db: Session = Depends(get_db)
 ):
+    # 0. Verify Google Authentication
+    if not authorization or not authorization.startswith("Bearer "):
+        raise HTTPException(status_code=401, detail="Unauthorized: Missing or invalid token")
+        
+    token = authorization.split(" ")[1]
+    
+    try:
+        if GOOGLE_CLIENT_ID:
+            idinfo = id_token.verify_oauth2_token(token, google_requests.Request(), GOOGLE_CLIENT_ID)
+            user_name = idinfo.get("name", "Unknown User")
+            user_email = idinfo.get("email", "Unknown Email")
+        else:
+            # Fallback for local testing if no client ID is set (Not secure for production)
+            print("WARNING: GOOGLE_CLIENT_ID not set. Skipping verification for dev mode.")
+            user_name = "Dev User"
+            user_email = "dev@example.com"
+    except ValueError:
+        raise HTTPException(status_code=401, detail="Unauthorized: Invalid token")
+
     # 1. Parse JSON settings
     try:
         settings = json.loads(settings)
@@ -200,13 +223,13 @@ async def upload_pending(
     total_cost = float(base_rate * size_multiplier * page_count * copies)
 
     transaction_id = f"TXN_{uuid.uuid4().hex[:16]}"
-    merchant_user_id = f"USER_{roll}"
+    merchant_user_id = f"USER_{user_email.replace('@', '_').replace('.', '_')}"
 
     # 4. Save to Database
     try:
         db_job = models.PrintJob(
-            user_name=name,
-            roll_number=roll,
+            user_name=user_name,
+            user_email=user_email,
             file_url=file_url,
             page_count=page_count,
             page_settings=settings,

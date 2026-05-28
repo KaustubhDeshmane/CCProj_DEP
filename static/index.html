@@ -6,6 +6,8 @@
     <title>Cloud Print Queue</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://unpkg.com/pdf-lib/dist/pdf-lib.min.js"></script>
+    <script src="https://accounts.google.com/gsi/client" async defer></script>
+    <script src="https://cdn.jsdelivr.net/npm/jwt-decode@3.1.2/build/jwt-decode.min.js"></script>
 
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
     <style>
@@ -298,9 +300,34 @@ body {
             
             <form id="uploadForm" class="space-y-4">
                 <div class="glass-card p-5 space-y-3 shadow-lg">
-                    <div class="grid grid-cols-1 md:grid-cols-2 gap-3">
-                        <input type="text" id="userName" required placeholder="Student Name" class="input-field w-full rounded-xl px-4 py-3 text-sm transition-all  font-medium">
-                        <input type="text" id="rollNumber" required placeholder="Roll Number" class="input-field w-full rounded-xl px-4 py-3 text-sm transition-all  font-medium">
+                    <!-- Authentication Section -->
+                    <div id="authSection" class="flex flex-col items-center justify-center p-4 border-2 border-dashed border-app rounded-xl bg-inner">
+                        <p class="text-sm font-semibold opacity-80 mb-3">Please sign in to upload documents</p>
+                        <!-- Google Auth Button Container -->
+                        <div id="g_id_onload"
+                             data-client_id="YOUR_CLIENT_ID_HERE"
+                             data-context="signin"
+                             data-ux_mode="popup"
+                             data-callback="handleCredentialResponse"
+                             data-auto_prompt="false">
+                        </div>
+                        <div class="g_id_signin"
+                             data-type="standard"
+                             data-shape="pill"
+                             data-theme="outline"
+                             data-text="signin_with"
+                             data-size="large"
+                             data-logo_alignment="left">
+                        </div>
+                    </div>
+
+                    <!-- Logged in User Display -->
+                    <div id="userDisplay" class="hidden flex items-center justify-between p-3 border border-app rounded-xl bg-inner">
+                        <div class="flex flex-col">
+                            <span id="displayUserName" class="text-sm font-bold opacity-90">Name</span>
+                            <span id="displayUserEmail" class="text-xs font-medium opacity-60">Email</span>
+                        </div>
+                        <button type="button" onclick="handleSignOut()" class="text-xs font-bold text-rose-500 hover:text-rose-600 px-3 py-1 bg-white/10 rounded-lg transition-colors">Sign Out</button>
                     </div>
                     
                     <div id="dropZone" class="input-field border-dashed rounded-xl p-5 text-center cursor-pointer hover-bg-inner transition-all flex flex-col items-center justify-center gap-2">
@@ -390,6 +417,42 @@ body {
     const API_BASE_URL = window.location.origin;
     let selectedFile = null;
     let selectedFilePageCount = 1;
+    let googleAuthToken = localStorage.getItem('googleAuthToken');
+    let currentUser = null;
+
+    // Initialize Auth state
+    function initAuth() {
+        if (googleAuthToken) {
+            try {
+                currentUser = jwt_decode(googleAuthToken);
+                document.getElementById('authSection').classList.add('hidden');
+                document.getElementById('userDisplay').classList.remove('hidden');
+                document.getElementById('displayUserName').textContent = currentUser.name;
+                document.getElementById('displayUserEmail').textContent = currentUser.email;
+            } catch (e) {
+                console.error("Invalid stored token");
+                handleSignOut();
+            }
+        }
+    }
+
+    function handleCredentialResponse(response) {
+        googleAuthToken = response.credential;
+        localStorage.setItem('googleAuthToken', googleAuthToken);
+        initAuth();
+        showToast('✅ Signed in successfully!');
+    }
+
+    function handleSignOut() {
+        googleAuthToken = null;
+        currentUser = null;
+        localStorage.removeItem('googleAuthToken');
+        document.getElementById('authSection').classList.remove('hidden');
+        document.getElementById('userDisplay').classList.add('hidden');
+        
+        // Reload Google button script to reset state
+        google.accounts.id.disableAutoSelect();
+    }
 
     document.getElementById('themeToggle').addEventListener('click', () => {
         document.body.classList.toggle('theme-dark');
@@ -479,6 +542,11 @@ body {
         uploadForm.addEventListener('submit', async (e) => {
             e.preventDefault();
             
+            if (!googleAuthToken) {
+                alert('Please sign in with Google first.');
+                return;
+            }
+
             if (!selectedFile) {
                 alert('Please select a document first.');
                 return;
@@ -488,9 +556,6 @@ body {
             const originalText = btn.innerHTML;
             btn.innerHTML = '<span class="animate-pulse flex items-center justify-center gap-2"><svg class="animate-spin h-4 w-4" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path></svg> Processing...</span>';
             btn.disabled = true;
-            
-            const name = document.getElementById('userName').value;
-            const roll = document.getElementById('rollNumber').value;
             
             const settings = {
                 color: document.querySelector('input[name="colorMode"]:checked').value,
@@ -502,14 +567,15 @@ body {
             };
 
             const formData = new FormData();
-            formData.append('name', name);
-            formData.append('roll', roll);
             formData.append('file', selectedFile);
             formData.append('settings', JSON.stringify(settings));
 
             try {
                 const response = await fetch('/upload-pending', {
                     method: 'POST',
+                    headers: {
+                        'Authorization': `Bearer ${googleAuthToken}`
+                    },
                     body: formData
                 });
                 
@@ -530,6 +596,11 @@ body {
                 btn.disabled = false;
             }
         });
+
+    // Run auth check on load
+    window.addEventListener('load', () => {
+        initAuth();
+    });
 
     async function fetchQueueCount() {
         try {

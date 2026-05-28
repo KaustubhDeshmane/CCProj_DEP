@@ -7,3 +7,4 @@ PyPDF2
 pyodbc
 python-dotenv
 requests
+google-auth

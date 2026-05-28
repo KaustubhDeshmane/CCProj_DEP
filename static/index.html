@@ -421,6 +421,29 @@ body {
     let googleAuthToken = localStorage.getItem('googleAuthToken');
     let currentUser = null;
 
+    function showToast(message) {
+        let container = document.getElementById('toast-container');
+        if (!container) {
+            container = document.createElement('div');
+            container.id = 'toast-container';
+            container.className = 'fixed bottom-5 right-5 z-50 flex flex-col gap-2';
+            document.body.appendChild(container);
+        }
+        const toast = document.createElement('div');
+        toast.className = 'bg-white text-black px-6 py-3 rounded-lg shadow-2xl transform transition-all duration-300 translate-y-10 opacity-0 font-bold border border-app';
+        toast.textContent = message;
+        container.appendChild(toast);
+        
+        requestAnimationFrame(() => {
+            toast.classList.remove('translate-y-10', 'opacity-0');
+        });
+        
+        setTimeout(() => {
+            toast.classList.add('translate-y-10', 'opacity-0');
+            setTimeout(() => toast.remove(), 300);
+        }, 3000);
+    }
+
     // Initialize Auth state
     function initAuth() {
         if (googleAuthToken) {

@@ -425,13 +425,13 @@ body {
     function initAuth() {
         if (googleAuthToken) {
             try {
-                currentUser = jwtDecode(googleAuthToken);
+                currentUser = jwt_decode(googleAuthToken);
                 document.getElementById('authSection').classList.add('hidden');
                 document.getElementById('userDisplay').classList.remove('hidden');
                 document.getElementById('displayUserName').textContent = currentUser.name;
                 document.getElementById('displayUserEmail').textContent = currentUser.email;
             } catch (e) {
-                console.error("Invalid stored token");
+                console.error("Invalid stored token", e);
                 handleSignOut();
             }
         }

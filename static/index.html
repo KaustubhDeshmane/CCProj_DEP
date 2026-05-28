@@ -519,7 +519,7 @@ body {
                     // Redirect to PhonePe payment page
                     window.location.href = data.redirectUrl;
                 } else {
-                    alert('❌ Error creating print job');
+                    alert('❌ Error: ' + (data.message || 'Failed to create print job'));
                     btn.innerHTML = originalText;
                     btn.disabled = false;
                 }

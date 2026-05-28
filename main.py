@@ -132,6 +132,7 @@ def admin_page():
 
 @app.post("/upload-pending")
 async def upload_pending(
+    request: Request,
     name: str = Form(...),
     roll: str = Form(...),
     settings: str = Form(...),
@@ -219,11 +220,11 @@ async def upload_pending(
         db.refresh(db_job)
     except Exception as e:
         print(f"DB Error: {e}")
-        raise HTTPException(status_code=500, detail="Database Save Failed. Delete your .db file and restart.")
+        return {"status": "error", "message": f"Database Save Failed: {e}"}
 
     # PhonePe Checkout Request
     amount_in_paise = int(total_cost * 100)
-    base_url = os.getenv("BASE_URL", "http://localhost:8000")
+    base_url = str(request.base_url).rstrip("/")
     
     payload = {
         "merchantId": PHONEPE_MERCHANT_ID,
@@ -261,10 +262,10 @@ async def upload_pending(
             return {"status": "success", "redirectUrl": payment_url}
         else:
             print("PhonePe Error:", response_data)
-            raise HTTPException(status_code=500, detail="Payment gateway error")
+            return {"status": "error", "message": f"PhonePe rejected request: {response_data.get('code')}"}
     except Exception as e:
         print("Request to PhonePe failed:", e)
-        raise HTTPException(status_code=500, detail="Payment gateway request failed")
+        return {"status": "error", "message": f"PhonePe API request failed: {e}"}
 
 @app.post("/payment/callback")
 async def payment_callback(transactionId: str = Form(...), code: str = Form(...), db: Session = Depends(get_db)):

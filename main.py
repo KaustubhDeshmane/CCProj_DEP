@@ -154,6 +154,10 @@ async def upload_pending(
             idinfo = id_token.verify_oauth2_token(token, google_requests.Request(), GOOGLE_CLIENT_ID)
             user_name = idinfo.get("name", "Unknown User")
             user_email = idinfo.get("email", "Unknown Email")
+            
+            # Strict Domain Verification
+            if not user_email.endswith("@dbit.in"):
+                raise HTTPException(status_code=403, detail="Forbidden: Only @dbit.in college emails are allowed")
         else:
             # Fallback for local testing if no client ID is set (Not secure for production)
             print("WARNING: GOOGLE_CLIENT_ID not set. Skipping verification for dev mode.")

@@ -254,6 +254,8 @@ async def upload_pending(
     # PhonePe Checkout Request
     amount_in_paise = int(total_cost * 100)
     base_url = str(request.base_url).rstrip("/")
+    if "azurewebsites.net" in base_url and base_url.startswith("http://"):
+        base_url = base_url.replace("http://", "https://")
     
     payload = {
         "merchantId": PHONEPE_MERCHANT_ID,

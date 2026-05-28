@@ -4,7 +4,7 @@ from typing import Any
 
 class PrintJobBase(BaseModel):
     user_name: str
-    roll_number: str
+    user_email: str
     file_url: str
     page_count: int
     page_settings: Any

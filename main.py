@@ -326,7 +326,7 @@ async def payment_callback(transactionId: str = Form(...), code: str = Form(...)
         
         if status_data.get("success") and status_data.get("code") == "PAYMENT_SUCCESS":
             if job:
-                job.payment_id = status_data["data"]["transactionId"]
+                job.status = "Paid"
                 db.commit()
             return RedirectResponse(url=f"/?success=true", status_code=303)
         else:
@@ -340,11 +340,11 @@ async def payment_callback(transactionId: str = Form(...), code: str = Form(...)
 
 @app.get("/queue", response_model=List[schemas.PrintJobResponse])
 def get_queue(db: Session = Depends(get_db)):
-    return db.query(models.PrintJob).filter(models.PrintJob.status == "Queued").all()
+    return db.query(models.PrintJob).filter(models.PrintJob.status == "Paid").all()
 
 @app.get("/queue/status")
 def get_queue_count(db: Session = Depends(get_db)):
-    jobs = db.query(models.PrintJob).filter(models.PrintJob.status == "Queued").all()
+    jobs = db.query(models.PrintJob).filter(models.PrintJob.status == "Paid").all()
     total_seconds = 0
     for job in jobs:
         total_seconds += calculate_job_duration_seconds(job.page_count, job.page_settings)

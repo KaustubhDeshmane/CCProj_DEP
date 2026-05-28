@@ -425,7 +425,7 @@ body {
     function initAuth() {
         if (googleAuthToken) {
             try {
-                currentUser = jwt_decode(googleAuthToken);
+                currentUser = jwtDecode(googleAuthToken);
                 document.getElementById('authSection').classList.add('hidden');
                 document.getElementById('userDisplay').classList.remove('hidden');
                 document.getElementById('displayUserName').textContent = currentUser.name;

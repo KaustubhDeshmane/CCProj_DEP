@@ -6,7 +6,7 @@
     <title>Cloud Print Queue</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://unpkg.com/pdf-lib/dist/pdf-lib.min.js"></script>
-    <script src="https://checkout.razorpay.com/v1/checkout.js"></script>
+
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
     <style>
         
@@ -464,111 +464,72 @@ body {
         document.getElementById('uiTimeEstimate').textContent = timeStr;
     }
 
-    document.getElementById('uploadForm').addEventListener('submit', async (e) => {
-        e.preventDefault();
-        
-        if (!selectedFile) {
-            alert('Please select a document first.');
-            return;
+        // Check for PhonePe callback success/failure in URL
+        const urlParams = new URLSearchParams(window.location.search);
+        if (urlParams.get('success') === 'true') {
+            showToast('✅ Print Job Submitted Successfully!');
+            window.history.replaceState({}, document.title, window.location.pathname);
+        } else if (urlParams.get('success') === 'false') {
+            const reason = urlParams.get('reason') || 'Payment Failed';
+            showToast(`❌ Error: ${reason.replace(/_/g, ' ')}`);
+            window.history.replaceState({}, document.title, window.location.pathname);
         }
 
-        const btn = document.getElementById('submitBtn');
-        const originalText = btn.innerHTML;
-        btn.innerHTML = '<span class="animate-pulse flex items-center justify-center gap-2"><svg class="animate-spin h-4 w-4" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path></svg> Processing...</span>';
-        btn.disabled = true;
-
-        const name = document.getElementById('userName').value;
-        const roll = document.getElementById('rollNumber').value;
-        
-        const settings = {
-            color: document.querySelector('input[name="colorMode"]:checked').value,
-            copies: parseInt(document.getElementById('copiesOption').value) || 1,
-            size: document.querySelector('input[name="paperSize"]:checked').value,
-            sides: document.querySelector('input[name="sides"]:checked').value,
-            pageCount: selectedFilePageCount,
-            timestamp_ms: Date.now()
-        };
-
-        const rate = (settings.color === "Color") ? 10 : 1;
-        const sizeMultiplier = (settings.size === "A3") ? 2 : 1;
-        const totalEstimate = rate * sizeMultiplier * settings.copies * selectedFilePageCount;
-
-        try {
-            const orderRes = await fetch(`${API_BASE_URL}/create-order`, {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ amount: totalEstimate })
-            });
+        const uploadForm = document.getElementById('uploadForm');
+        uploadForm.addEventListener('submit', async (e) => {
+            e.preventDefault();
             
-            if (!orderRes.ok) throw new Error("Failed to create order");
-            const orderData = await orderRes.json();
-            
-            const rzpOptions = {
-                key: "rzp_test_St6Y030jGI531w",
-                amount: totalEstimate * 100,
-                currency: "INR",
-                name: "Cloud Print",
-                description: "Print Job Payment",
-                order_id: orderData.order_id,
-                handler: async function (response) {
-                    btn.innerHTML = '<span class="animate-pulse">Uploading to Cloud...</span>';
-                    
-                    const formData = new FormData();
-                    formData.append('name', name);
-                    formData.append('roll', roll);
-                    formData.append('options', JSON.stringify(settings));
-                    formData.append('file', selectedFile);
-                    formData.append('razorpay_payment_id', response.razorpay_payment_id);
-                    formData.append('razorpay_order_id', response.razorpay_order_id);
-                    formData.append('razorpay_signature', response.razorpay_signature);
+            if (!selectedFile) {
+                alert('Please select a document first.');
+                return;
+            }
 
-                    const uploadRes = await fetch(`${API_BASE_URL}/upload`, { method: 'POST', body: formData });
-                    
-                    if (uploadRes.ok) {
-                        const toast = document.getElementById('successToast');
-                        if (toast) toast.classList.remove('hidden');
-                        setTimeout(() => { if (toast) toast.classList.add('hidden') }, 3000);
-                        
-                        e.target.reset();
-                        selectedFile = null;
-                        selectedFilePageCount = 1;
-                        document.getElementById('fileNameDisplay').textContent = "Tap to select document";
-                        document.getElementById('fileNameDisplay').classList.add('opacity-60');
-                        document.getElementById('fileNameDisplay').classList.remove('opacity-100', 'font-bold', 'text-emerald-300');
-                        calculateUIEstimate();
-                        fetchQueueCount();
-                    } else {
-                        alert("Upload failed. Please contact admin with Payment ID: " + response.razorpay_payment_id);
-                    }
-                    
+            const btn = document.getElementById('submitBtn');
+            const originalText = btn.innerHTML;
+            btn.innerHTML = '<span class="animate-pulse flex items-center justify-center gap-2"><svg class="animate-spin h-4 w-4" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path></svg> Processing...</span>';
+            btn.disabled = true;
+            
+            const name = document.getElementById('userName').value;
+            const roll = document.getElementById('rollNumber').value;
+            
+            const settings = {
+                color: document.querySelector('input[name="colorMode"]:checked').value,
+                copies: parseInt(document.getElementById('copiesOption').value) || 1,
+                size: document.querySelector('input[name="paperSize"]:checked').value,
+                sides: document.querySelector('input[name="sides"]:checked').value,
+                pageCount: selectedFilePageCount,
+                timestamp_ms: Date.now()
+            };
+
+            const formData = new FormData();
+            formData.append('name', name);
+            formData.append('roll', roll);
+            formData.append('file', selectedFile);
+            formData.append('settings', JSON.stringify(settings));
+
+            try {
+                const response = await fetch('/upload-pending', {
+                    method: 'POST',
+                    body: formData
+                });
+                
+                const data = await response.json();
+                
+                if (response.ok && data.status === 'success' && data.redirectUrl) {
+                    // Redirect to PhonePe payment page
+                    window.location.href = data.redirectUrl;
+                } else {
+                    alert('❌ Error creating print job');
                     btn.innerHTML = originalText;
                     btn.disabled = false;
-                },
-                prefill: { name: name },
-                theme: { color: "#f72585" },
-                modal: {
-                    ondismiss: function() {
-                        btn.innerHTML = originalText;
-                        btn.disabled = false;
-                    }
                 }
-            };
-            
-            const rzp = new Razorpay(rzpOptions);
-            rzp.on('payment.failed', function (response){
-                alert("Payment Failed: " + response.error.description);
+            } catch (error) {
+                console.error('Error:', error);
+                alert('❌ Server error occurred');
                 btn.innerHTML = originalText;
                 btn.disabled = false;
-            });
-            rzp.open();
-            
-        } catch (error) {
-            console.error(error);
-            alert("Error preparing checkout. Please try again.");
-            btn.innerHTML = originalText;
-            btn.disabled = false;
-        }
-    });
+            }
+        });
 
     async function fetchQueueCount() {
         try {

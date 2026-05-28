@@ -44,8 +44,9 @@ else:
         # All four Azure vars present — build the Azure SQL connection string
         print("[DB] All AZURE_SQL_* vars found. Connecting to Azure SQL...")
         SQLALCHEMY_DATABASE_URL = (
-            f"mssql+pymssql://{AZURE_SQL_USER}:{AZURE_SQL_PASSWORD}"
+            f"mssql+pyodbc://{AZURE_SQL_USER}:{AZURE_SQL_PASSWORD}"
             f"@{AZURE_SQL_SERVER}/{AZURE_SQL_DATABASE}"
+            f"?driver=ODBC+Driver+18+for+SQL+Server&Encrypt=yes&TrustServerCertificate=no"
         )
     else:
         # No DATABASE_URL and Azure vars are incomplete — fall back to SQLite

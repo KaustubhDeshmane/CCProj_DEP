@@ -4,6 +4,6 @@ sqlalchemy
 python-multipart
 azure-storage-blob
 PyPDF2
-pymssql
+pyodbc
 python-dotenv
 razorpay

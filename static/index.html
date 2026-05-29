@@ -1228,21 +1228,19 @@ body {
                 const displayName = nameParts.length > 1 ? nameParts.slice(1).join('_') : rawName;
                 
                 let progressBarHtml = '';
-                if (isPaid || sessionCompletedJobs.has(job.id)) {
-                    if (isPaid) {
-                        const p = job.progress_percent || 0;
-                        progressBarHtml = `
-                            <div class="w-full bg-gray-200 [.theme-dark_&]:bg-gray-800 rounded-full mt-3 h-2 overflow-hidden flex justify-start items-center relative">
-                                <div class="progress-active rounded-full h-full absolute left-0 top-0 transition-all duration-1000 ease-in-out" style="width: ${p}%;"></div>
-                            </div>
-                        `;
+                if (isPaid) {
+                    const p = job.progress_percent || 0;
+                    progressBarHtml = `
+                        <div class="w-full bg-gray-200 [.theme-dark_&]:bg-gray-800 rounded-full mt-3 h-2 overflow-hidden flex justify-start items-center relative">
+                            <div class="progress-active rounded-full h-full absolute left-0 top-0 transition-all duration-1000 ease-in-out" style="width: ${p}%;"></div>
+                        </div>
+                    `;
+                } else if (isCompleted) {
+                    if (isJustCompleted) {
+                        progressBarHtml = `<div class="progress-done-bounce">Done!</div>`;
                     } else {
-                        if (isJustCompleted) {
-                            progressBarHtml = `<div class="progress-done-bounce">Done!</div>`;
-                        } else {
-                            const settingsStr = JSON.stringify(job.page_settings).replace(/'/g, "&#39;").replace(/"/g, "&quot;");
-                            progressBarHtml = `<button type="button" onclick='openReprintModal("${job.id}", "${rawName}", "${settingsStr}")' class="mt-3 bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-500 border border-emerald-500/30 rounded-full flex items-center justify-center font-bold text-[13px] h-[28px] w-[90px] transition-colors shadow-sm">Reprint</button>`;
-                        }
+                        const settingsStr = JSON.stringify(job.page_settings).replace(/'/g, "&#39;").replace(/"/g, "&quot;");
+                        progressBarHtml = `<button type="button" onclick='openReprintModal("${job.id}", "${rawName}", "${settingsStr}")' class="mt-3 bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-500 border border-emerald-500/30 rounded-full flex items-center justify-center font-bold text-[13px] h-[28px] w-[90px] transition-colors shadow-sm cursor-pointer pointer-events-auto">Reprint</button>`;
                     }
                 }
 

@@ -213,7 +213,6 @@ def get_my_jobs(user: dict = Depends(get_current_user), db: Session = Depends(ge
         elif job.status == "Completed":
             progress = 100
             
-        # Convert to dictionary/pydantic compatible format
         job_data = {
             "id": job.id,
             "user_name": job.user_name,
@@ -229,6 +228,31 @@ def get_my_jobs(user: dict = Depends(get_current_user), db: Session = Depends(ge
         result.append(job_data)
         
     return result
+
+@app.delete("/admin/wipe-database")
+def wipe_database(user: dict = Depends(get_current_user), db: Session = Depends(get_db)):
+    # Very strict security check for demo purposes
+    if user.get("email") not in ["dev0039@dbit.in", "223dev0039@dbit.in"]:
+        raise HTTPException(status_code=403, detail="Unauthorized. Admin access required to wipe database.")
+        
+    try:
+        jobs = db.query(models.PrintJob).all()
+        deleted_count = 0
+        for job in jobs:
+            if blob_service_client:
+                try:
+                    blob_name = job.file_url.split('/')[-1].split('?')[0]
+                    blob_client = blob_service_client.get_blob_client(container=AZURE_CONTAINER_NAME, blob=blob_name)
+                    blob_client.delete_blob()
+                except Exception:
+                    pass
+            db.delete(job)
+            deleted_count += 1
+            
+        db.commit()
+        return {"message": f"Successfully wiped {deleted_count} jobs and files from the system for a fresh start."}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
 
 @app.post("/upload-pending")
 async def upload_pending(

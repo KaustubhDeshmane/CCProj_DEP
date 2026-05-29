@@ -508,11 +508,33 @@ body {
         }, 3000);
     }
 
+    // Helper to clear the file input
+    function clearFileInput() {
+        selectedFile = null;
+        selectedFilePageCount = 1;
+        document.getElementById('fileInput').value = '';
+        document.getElementById('fileNameDisplay').textContent = 'Tap to select document';
+        document.getElementById('fileNameDisplay').classList.remove('opacity-100', 'font-bold', 'text-emerald-300');
+        document.getElementById('fileNameDisplay').classList.add('opacity-60');
+        document.getElementById('uploadIcon').classList.remove('hidden');
+        document.getElementById('pdfPreview').classList.add('hidden');
+        document.getElementById('uiCostEstimate').textContent = '₹0';
+        document.getElementById('uiTimeEstimate').textContent = '< 1 MIN';
+    }
+
     // Initialize Auth state
     function initAuth() {
         if (googleAuthToken) {
             try {
                 currentUser = jwt_decode(googleAuthToken);
+                
+                // Check if token is expired
+                if (currentUser.exp * 1000 < Date.now()) {
+                    console.warn("Token expired, signing out.");
+                    handleSignOut();
+                    return;
+                }
+                
                 document.getElementById('authSection').classList.add('hidden');
                 document.getElementById('userDisplay').classList.remove('hidden');
                 document.getElementById('displayUserName').textContent = currentUser.name;
@@ -530,6 +552,7 @@ body {
     function handleCredentialResponse(response) {
         googleAuthToken = response.credential;
         localStorage.setItem('googleAuthToken', googleAuthToken);
+        clearFileInput();
         initAuth();
         showToast('✅ Signed in successfully!');
     }
@@ -542,6 +565,8 @@ body {
         document.getElementById('userDisplay').classList.add('hidden');
         document.getElementById('unifiedDashboard').classList.add('hidden');
         document.getElementById('unifiedDashboard').classList.remove('flex');
+        clearFileInput();
+        
         if (dashboardInterval) {
             clearInterval(dashboardInterval);
             dashboardInterval = null;

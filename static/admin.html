@@ -241,6 +241,7 @@ body {
             <h1 class="text-2xl font-black tracking-tight">Admin Dashboard</h1>
         </div>
         <div class="flex items-center gap-4">
+            <button onclick="wipeDatabase()" class="px-4 py-2 bg-rose-500/20 hover:bg-rose-500/40 text-rose-500 rounded-lg text-xs font-bold transition-colors shadow-sm border border-rose-500/30">Wipe Database (Fresh Start)</button>
             <button id="themeToggle" class="w-16 h-10 rounded-full bg-[#fde047] [.theme-dark_&]:bg-[#7dd3fc] shadow-inner border border-app flex items-center px-1 cursor-pointer transition-colors relative focus:outline-none" title="Toggle Dark/Light Mode">
                 <div class="w-8 h-8 rounded-full shadow-md transition-all duration-300 transform translate-x-0 [.theme-dark_&]:translate-x-6 z-10 relative overflow-hidden bg-[#fef08a] [.theme-dark_&]:bg-[#bae6fd]">
                     <div class="absolute inset-0 flex items-center justify-center transition-opacity duration-300 opacity-100 [.theme-dark_&]:opacity-0 text-base leading-none">☀️</div>
@@ -380,6 +381,32 @@ body {
 
     fetchQueue();
     setInterval(fetchQueue, 5000);
-</script>
+        async function wipeDatabase() {
+            const token = localStorage.getItem('googleAuthToken');
+            if(!token) {
+                alert("Please sign in from the main page first.");
+                return;
+            }
+            if(!confirm("Are you SURE you want to permanently delete all print jobs and files? This cannot be undone.")) return;
+            
+            try {
+                const res = await fetch(`${API_BASE_URL}/admin/wipe-database`, {
+                    method: 'DELETE',
+                    headers: { 'Authorization': `Bearer ${token}` }
+                });
+                
+                if (res.ok) {
+                    const data = await res.json();
+                    alert(data.message);
+                    fetchQueue();
+                } else {
+                    const err = await res.json();
+                    alert("Failed: " + err.detail);
+                }
+            } catch (e) {
+                alert("Error connecting to server.");
+            }
+        }
+    </script>
 </body>
 </html>

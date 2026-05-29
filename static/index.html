@@ -404,7 +404,7 @@ body {
 
                 <div class="glass-card p-5 flex flex-col gap-4 shadow-lg relative">
                     <!-- Settings Header for Multiple Files -->
-                    <div class="flex items-center justify-between border-b border-app pb-3 mb-1">
+                    <div id="batchSettingsHeader" class="hidden items-center justify-between border-b border-app pb-3 mb-1">
                         <div class="flex flex-col overflow-hidden max-w-[60%]">
                             <span class="text-[10px] font-bold opacity-50 uppercase tracking-widest">Settings for</span>
                             <span id="currentSettingsFilename" class="text-sm font-bold truncate text-emerald-400">None selected</span>
@@ -669,7 +669,7 @@ body {
             for (let i = 0; i < selectedFiles.length; i++) {
                 const file = selectedFiles[i];
                 const div = document.createElement('div');
-                div.className = "snap-center shrink-0 w-32 flex flex-col items-center justify-center cursor-pointer opacity-50 transition-all duration-300";
+                div.className = "snap-center snap-always shrink-0 w-32 flex flex-col items-center justify-center cursor-pointer opacity-50 transition-all duration-300 scale-90";
                 div.id = `carousel-item-${i}`;
                 div.onclick = (ev) => { ev.stopPropagation(); selectFileIndex(i); };
                 
@@ -713,20 +713,58 @@ body {
             }
             
             if (selectedFiles.length > 1) {
+                document.getElementById('batchSettingsHeader').classList.remove('hidden');
+                document.getElementById('batchSettingsHeader').classList.add('flex');
                 document.getElementById('carouselLeftBtn').classList.remove('scale-0');
                 document.getElementById('carouselRightBtn').classList.remove('scale-0');
             } else {
+                document.getElementById('batchSettingsHeader').classList.add('hidden');
+                document.getElementById('batchSettingsHeader').classList.remove('flex');
                 document.getElementById('carouselLeftBtn').classList.add('scale-0');
                 document.getElementById('carouselRightBtn').classList.add('scale-0');
             }
             
             selectFileIndex(0);
+            
+            // Add scroll listener for mobile swipe snapping
+            const carouselElem = document.getElementById('pdfCarousel');
+            carouselElem.onscroll = () => {
+                clearTimeout(carouselElem.scrollTimeout);
+                carouselElem.scrollTimeout = setTimeout(() => {
+                    let closestIndex = 0;
+                    let minDistance = Infinity;
+                    const carouselCenter = carouselElem.scrollLeft + (carouselElem.clientWidth / 2);
+                    for(let i = 0; i < selectedFiles.length; i++) {
+                        const item = document.getElementById(`carousel-item-${i}`);
+                        if(!item) continue;
+                        const itemCenter = item.offsetLeft + (item.clientWidth / 2) - carouselElem.offsetLeft;
+                        const distance = Math.abs(carouselCenter - itemCenter);
+                        if (distance < minDistance) {
+                            minDistance = distance;
+                            closestIndex = i;
+                        }
+                    }
+                    if (closestIndex !== currentFileIndex) {
+                        currentFileIndex = closestIndex;
+                        updateUIForFile(closestIndex);
+                    }
+                }, 150);
+            };
         }
     });
 
     function selectFileIndex(index) {
         if(index < 0 || index >= selectedFiles.length) return;
         currentFileIndex = index;
+        updateUIForFile(index);
+        
+        const item = document.getElementById(`carousel-item-${index}`);
+        if(item) {
+            item.scrollIntoView({ behavior: 'smooth', block: 'nearest', inline: 'center' });
+        }
+    }
+
+    function updateUIForFile(index) {
         const file = selectedFiles[index];
         
         for(let i=0; i<selectedFiles.length; i++) {
@@ -734,7 +772,6 @@ body {
             if(i === index) {
                 item.classList.remove('opacity-50', 'scale-90');
                 item.classList.add('opacity-100', 'scale-100');
-                item.scrollIntoView({ behavior: 'smooth', block: 'nearest', inline: 'center' });
             } else {
                 item.classList.remove('opacity-100', 'scale-100');
                 item.classList.add('opacity-50', 'scale-90');
@@ -1097,7 +1134,8 @@ body {
                         if (isJustCompleted) {
                             progressBarHtml = `<div class="progress-done-bounce">Done!</div>`;
                         } else {
-                            progressBarHtml = `<div class="mt-3 bg-emerald-500 text-white rounded-full flex items-center justify-center font-extrabold text-[13px] h-[28px] w-[90px]">Done!</div>`;
+                            const settingsStr = JSON.stringify(job.page_settings).replace(/'/g, "&#39;").replace(/"/g, "&quot;");
+                            progressBarHtml = `<button type="button" onclick='openReprintModal("${job.id}", "${rawName}", "${settingsStr}")' class="mt-3 bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-500 border border-emerald-500/30 rounded-full flex items-center justify-center font-bold text-[13px] h-[28px] w-[90px] transition-colors shadow-sm">Reprint</button>`;
                         }
                     }
                 }

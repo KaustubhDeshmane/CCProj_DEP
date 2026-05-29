@@ -43,9 +43,12 @@ else:
     if not _missing:
         # All four Azure vars present — build the Azure SQL connection string
         print("[DB] All AZURE_SQL_* vars found. Connecting to Azure SQL...")
+        # Clean up the server string just in case it contains tcp: or port numbers
+        clean_server = AZURE_SQL_SERVER.replace("tcp:", "").split(",")[0].split(":")[0]
+        
         SQLALCHEMY_DATABASE_URL = (
             f"mssql+pymssql://{AZURE_SQL_USER}:{AZURE_SQL_PASSWORD}"
-            f"@{AZURE_SQL_SERVER}:1433/{AZURE_SQL_DATABASE}"
+            f"@{clean_server}:1433/{AZURE_SQL_DATABASE}"
         )
     else:
         # No DATABASE_URL and Azure vars are incomplete — fall back to SQLite

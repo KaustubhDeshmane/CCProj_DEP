@@ -9,3 +9,4 @@ python-dotenv
 requests
 google-auth
 apscheduler
+gunicorn

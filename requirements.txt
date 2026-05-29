@@ -4,7 +4,7 @@ sqlalchemy
 python-multipart
 azure-storage-blob
 PyPDF2
-pyodbc
+pymssql
 python-dotenv
 requests
 google-auth

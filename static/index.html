@@ -525,8 +525,8 @@ body {
         </div>
         <p class="text-sm text-white/90" id="reprintModalText">Do you want to reprint <span class="font-bold text-emerald-400 truncate block mt-1" id="reprintModalFilename"></span> using the exact same configuration as before?</p>
         <div class="flex flex-col gap-2 mt-2">
-            <button onclick="reprintWithOldSettings()" class="w-full btn-gradient py-2.5 rounded-xl font-bold text-sm">Yes, Print Now</button>
-            <button onclick="reprintWithNewSettings()" class="w-full bg-black/10 hover:bg-black/20 [.theme-dark_&]:bg-white/10 [.theme-dark_&]:hover:bg-white/20 border border-black/20 [.theme-dark_&]:border-white/20 py-2.5 rounded-xl font-bold text-sm transition-colors">No, Change Settings</button>
+            <button onclick="reprintWithOldSettings()" class="w-full btn-gradient py-2.5 rounded-xl font-bold text-sm text-white">Yes, Print Now</button>
+            <button onclick="reprintWithNewSettings()" class="w-full bg-black/10 hover:bg-black/20 [.theme-dark_&]:bg-white/10 [.theme-dark_&]:hover:bg-white/20 border border-black/20 [.theme-dark_&]:border-white/20 py-2.5 rounded-xl font-bold text-sm text-white transition-colors">No, Change Settings</button>
         </div>
     </div>
 </div>
@@ -1108,6 +1108,8 @@ body {
         // Create mock carousel for 1 file
         const carousel = document.getElementById('pdfCarousel');
         carousel.innerHTML = '';
+        carousel.classList.remove('px-[calc(50%-64px)]', 'justify-start');
+        carousel.classList.add('justify-center');
         
         const div = document.createElement('div');
         div.className = "snap-center shrink-0 w-32 flex flex-col items-center justify-center opacity-100 transition-all duration-300 scale-100";
@@ -1227,7 +1229,7 @@ body {
                 let statusColor = isCompleted ? 'text-emerald-500' : (job.status === 'Paid' ? 'text-blue-500' : 'text-gray-500');
                 
                 // Filename preservation logic
-                const rawName = job.file_url.split('/').pop().split('?')[0];
+                const rawName = decodeURIComponent(job.file_url.split('/').pop().split('?')[0]);
                 const nameParts = rawName.split('_');
                 const displayName = nameParts.length > 1 ? nameParts.slice(1).join('_') : rawName;
                 

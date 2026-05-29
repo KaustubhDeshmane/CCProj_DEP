@@ -400,6 +400,11 @@ body {
                         </div>
                         <input type="file" id="fileInput" class="hidden" accept=".pdf,.doc,.docx,.jpg,.png" multiple>
                     </div>
+                    <!-- Add more button -->
+                    <button type="button" id="addMoreFilesBtn" class="hidden w-full py-2.5 bg-inner hover-bg-inner border border-app rounded-xl text-xs font-bold transition-all shadow-sm flex items-center justify-center gap-2" onclick="document.getElementById('fileInput').click()">
+                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"></path></svg>
+                        Add More Documents
+                    </button>
                 </div>
 
                 <div class="glass-card p-5 flex flex-col gap-4 shadow-lg relative">
@@ -649,29 +654,50 @@ body {
     const fileInput = document.getElementById('fileInput');
     const fileNameDisplay = document.getElementById('fileNameDisplay');
     document.getElementById('dropZone').addEventListener('click', () => fileInput.click());
+    let previewCache = {};
+    let isProgrammaticScroll = false;
+    let programmaticScrollTimeout = null;
+
     document.getElementById('fileInput').addEventListener('change', async (e) => {
         if (e.target.files.length > 0) {
-            selectedFiles = Array.from(e.target.files);
-            filesSettings = {};
-            activeReprintJobId = null;
-            activeReprintFileUrl = null;
+            const newFiles = Array.from(e.target.files).filter(f => !selectedFiles.some(existing => existing.name === f.name));
+            if (newFiles.length === 0) return;
+
+            const startIndex = selectedFiles.length;
+            selectedFiles = selectedFiles.concat(newFiles);
             
-            for(let file of selectedFiles) {
+            if (startIndex === 0) {
+                filesSettings = {};
+                activeReprintJobId = null;
+                activeReprintFileUrl = null;
+            }
+            
+            for(let file of newFiles) {
                 filesSettings[file.name] = { color: 'B&W', size: 'A4', sides: 'Single', copies: 1, pageCount: 1 };
             }
             
             document.getElementById('dropZoneInitial').classList.add('hidden');
             document.getElementById('pdfCarouselContainer').classList.remove('hidden');
+            document.getElementById('addMoreFilesBtn').classList.remove('hidden');
             
             const carousel = document.getElementById('pdfCarousel');
-            carousel.innerHTML = '';
+            if (startIndex === 0) carousel.innerHTML = '';
             
-            for (let i = 0; i < selectedFiles.length; i++) {
+            for (let i = startIndex; i < selectedFiles.length; i++) {
                 const file = selectedFiles[i];
                 const div = document.createElement('div');
-                div.className = "snap-center snap-always shrink-0 w-32 flex flex-col items-center justify-center cursor-pointer opacity-50 transition-all duration-300 scale-90";
+                div.className = "snap-center snap-always shrink-0 w-32 flex flex-col items-center justify-center cursor-pointer opacity-50 transition-all duration-300 scale-90 relative";
                 div.id = `carousel-item-${i}`;
                 div.onclick = (ev) => { ev.stopPropagation(); selectFileIndex(i); };
+                
+                const removeBtn = document.createElement('button');
+                removeBtn.className = "absolute -top-2 -right-2 bg-rose-500 text-white rounded-full w-5 h-5 flex items-center justify-center shadow-md hover:bg-rose-600 transition-colors z-30 opacity-90";
+                removeBtn.innerHTML = "×";
+                removeBtn.onclick = (ev) => {
+                    ev.stopPropagation();
+                    removeFile(file.name);
+                };
+                div.appendChild(removeBtn);
                 
                 const canvas = document.createElement('canvas');
                 canvas.className = "max-h-24 rounded-lg shadow-sm w-auto mx-auto border border-white/10";
@@ -684,6 +710,7 @@ body {
                 div.appendChild(p);
                 
                 carousel.appendChild(div);
+                previewCache[file.name] = { canvas: canvas, label: p };
                 
                 if (file.type === 'application/pdf' || file.name.toLowerCase().endsWith('.pdf')) {
                     try {
@@ -712,51 +739,130 @@ body {
                 }
             }
             
-            if (selectedFiles.length > 1) {
-                document.getElementById('batchSettingsHeader').classList.remove('hidden');
-                document.getElementById('batchSettingsHeader').classList.add('flex');
-                document.getElementById('carouselLeftBtn').classList.remove('scale-0');
-                document.getElementById('carouselRightBtn').classList.remove('scale-0');
-            } else {
-                document.getElementById('batchSettingsHeader').classList.add('hidden');
-                document.getElementById('batchSettingsHeader').classList.remove('flex');
-                document.getElementById('carouselLeftBtn').classList.add('scale-0');
-                document.getElementById('carouselRightBtn').classList.add('scale-0');
-            }
+            updateCarouselUI();
+            if (startIndex === 0) selectFileIndex(0);
             
-            selectFileIndex(0);
-            
-            // Add scroll listener for mobile swipe snapping
-            const carouselElem = document.getElementById('pdfCarousel');
-            carouselElem.onscroll = () => {
-                clearTimeout(carouselElem.scrollTimeout);
-                carouselElem.scrollTimeout = setTimeout(() => {
-                    let closestIndex = 0;
-                    let minDistance = Infinity;
-                    const carouselCenter = carouselElem.scrollLeft + (carouselElem.clientWidth / 2);
-                    for(let i = 0; i < selectedFiles.length; i++) {
-                        const item = document.getElementById(`carousel-item-${i}`);
-                        if(!item) continue;
-                        const itemCenter = item.offsetLeft + (item.clientWidth / 2) - carouselElem.offsetLeft;
-                        const distance = Math.abs(carouselCenter - itemCenter);
-                        if (distance < minDistance) {
-                            minDistance = distance;
-                            closestIndex = i;
+            // Add scroll listener for mobile swipe snapping (binds once if startIndex === 0)
+            if (startIndex === 0) {
+                const carouselElem = document.getElementById('pdfCarousel');
+                carouselElem.onscroll = () => {
+                    if (isProgrammaticScroll) return;
+                    clearTimeout(carouselElem.scrollTimeout);
+                    carouselElem.scrollTimeout = setTimeout(() => {
+                        if (isProgrammaticScroll) return;
+                        let closestIndex = 0;
+                        let minDistance = Infinity;
+                        const carouselCenter = carouselElem.scrollLeft + (carouselElem.clientWidth / 2);
+                        for(let j = 0; j < selectedFiles.length; j++) {
+                            const item = document.getElementById(`carousel-item-${j}`);
+                            if(!item) continue;
+                            const itemCenter = item.offsetLeft + (item.clientWidth / 2) - carouselElem.offsetLeft;
+                            const distance = Math.abs(carouselCenter - itemCenter);
+                            if (distance < minDistance) {
+                                minDistance = distance;
+                                closestIndex = j;
+                            }
                         }
-                    }
-                    if (closestIndex !== currentFileIndex) {
-                        currentFileIndex = closestIndex;
-                        updateUIForFile(closestIndex);
-                    }
-                }, 150);
-            };
+                        if (closestIndex !== currentFileIndex) {
+                            currentFileIndex = closestIndex;
+                            updateUIForFile(closestIndex);
+                        }
+                    }, 150);
+                };
+            }
         }
     });
+
+    function updateCarouselUI() {
+        const carousel = document.getElementById('pdfCarousel');
+        if (selectedFiles.length > 1) {
+            document.getElementById('batchSettingsHeader').classList.remove('hidden');
+            document.getElementById('batchSettingsHeader').classList.add('flex');
+            document.getElementById('carouselLeftBtn').classList.remove('scale-0');
+            document.getElementById('carouselRightBtn').classList.remove('scale-0');
+            carousel.classList.add('px-[25%]', 'justify-start');
+            carousel.classList.remove('justify-center');
+        } else {
+            document.getElementById('batchSettingsHeader').classList.add('hidden');
+            document.getElementById('batchSettingsHeader').classList.remove('flex');
+            document.getElementById('carouselLeftBtn').classList.add('scale-0');
+            document.getElementById('carouselRightBtn').classList.add('scale-0');
+            carousel.classList.remove('px-[25%]', 'justify-start');
+            carousel.classList.add('justify-center');
+        }
+    }
+
+    function renderAllPreviews() {
+        const carousel = document.getElementById('pdfCarousel');
+        carousel.innerHTML = '';
+        
+        for (let i = 0; i < selectedFiles.length; i++) {
+            const file = selectedFiles[i];
+            const div = document.createElement('div');
+            div.className = "snap-center snap-always shrink-0 w-32 flex flex-col items-center justify-center cursor-pointer opacity-50 transition-all duration-300 scale-90 relative";
+            div.id = `carousel-item-${i}`;
+            div.onclick = (ev) => { ev.stopPropagation(); selectFileIndex(i); };
+            
+            const removeBtn = document.createElement('button');
+            removeBtn.className = "absolute -top-2 -right-2 bg-rose-500 text-white rounded-full w-5 h-5 flex items-center justify-center shadow-md hover:bg-rose-600 transition-colors z-30 opacity-90";
+            removeBtn.innerHTML = "×";
+            removeBtn.onclick = (ev) => {
+                ev.stopPropagation();
+                removeFile(file.name);
+            };
+            div.appendChild(removeBtn);
+
+            if (previewCache[file.name]) {
+                div.appendChild(previewCache[file.name].canvas);
+                div.appendChild(previewCache[file.name].label);
+            }
+            
+            carousel.appendChild(div);
+        }
+    }
+
+    function removeFile(fileName) {
+        const index = selectedFiles.findIndex(f => f.name === fileName);
+        if (index === -1) return;
+        
+        selectedFiles.splice(index, 1);
+        delete filesSettings[fileName];
+        
+        if (selectedFiles.length === 0) {
+            document.getElementById('dropZoneInitial').classList.remove('hidden');
+            document.getElementById('pdfCarouselContainer').classList.add('hidden');
+            document.getElementById('addMoreFilesBtn').classList.add('hidden');
+            document.getElementById('batchSettingsHeader').classList.add('hidden');
+            document.getElementById('batchSettingsHeader').classList.remove('flex');
+            document.getElementById('uiCostEstimate').textContent = '₹0';
+            document.getElementById('uiTimeEstimate').textContent = '< 1 MIN';
+            document.getElementById('currentSettingsFilename').textContent = 'None selected';
+            currentFileIndex = 0;
+            
+            const fileInput = document.getElementById('fileInput');
+            fileInput.value = ''; // Reset file input so they can re-select the same file
+            return;
+        }
+        
+        if (currentFileIndex >= selectedFiles.length) {
+            currentFileIndex = selectedFiles.length - 1;
+        }
+        
+        renderAllPreviews();
+        updateCarouselUI();
+        selectFileIndex(currentFileIndex);
+    }
 
     function selectFileIndex(index) {
         if(index < 0 || index >= selectedFiles.length) return;
         currentFileIndex = index;
         updateUIForFile(index);
+        
+        isProgrammaticScroll = true;
+        clearTimeout(programmaticScrollTimeout);
+        programmaticScrollTimeout = setTimeout(() => {
+            isProgrammaticScroll = false;
+        }, 800); // Allow sufficient time for smooth scroll to finish on desktop
         
         const item = document.getElementById(`carousel-item-${index}`);
         if(item) {

@@ -1046,7 +1046,10 @@ body {
             }
         });
 
-    function openReprintModal(jobId, fileName, oldSettingsStr) {
+    function openReprintModal(safeJobId, safeFileName, safeOldSettingsStr) {
+        const jobId = decodeURIComponent(safeJobId);
+        const fileName = decodeURIComponent(safeFileName);
+        const oldSettingsStr = decodeURIComponent(safeOldSettingsStr);
         let oldSettings = {};
         try { oldSettings = JSON.parse(oldSettingsStr); } catch(e) {}
         
@@ -1239,8 +1242,10 @@ body {
                     if (isJustCompleted) {
                         progressBarHtml = `<div class="progress-done-bounce">Done!</div>`;
                     } else {
-                        const settingsStr = JSON.stringify(job.page_settings).replace(/'/g, "&#39;").replace(/"/g, "&quot;");
-                        progressBarHtml = `<button type="button" onclick='openReprintModal("${job.id}", "${rawName}", "${settingsStr}")' class="mt-3 bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-500 border border-emerald-500/30 rounded-full flex items-center justify-center font-bold text-[13px] h-[28px] w-[90px] transition-colors shadow-sm cursor-pointer pointer-events-auto">Reprint</button>`;
+                        const safeId = encodeURIComponent(job.id);
+                        const safeName = encodeURIComponent(rawName);
+                        const safeSettings = encodeURIComponent(JSON.stringify(job.page_settings || {}));
+                        progressBarHtml = `<button type="button" onclick="openReprintModal('${safeId}', '${safeName}', '${safeSettings}')" class="mt-3 bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-500 border border-emerald-500/30 rounded-full flex items-center justify-center font-bold text-[13px] h-[28px] w-[90px] transition-colors shadow-sm cursor-pointer pointer-events-auto">Reprint</button>`;
                     }
                 }
 

@@ -375,15 +375,48 @@ body {
                         <button type="button" onclick="handleSignOut()" class="text-xs font-bold text-rose-500 hover:text-rose-600 px-3 py-1 bg-white/10 rounded-lg transition-colors">Sign Out</button>
                     </div>
                     
-                    <div id="dropZone" class="input-field border-dashed rounded-xl p-5 text-center cursor-pointer hover-bg-inner transition-all flex flex-col items-center justify-center gap-2 relative overflow-hidden">
-                        <svg id="uploadIcon" class="w-6 h-6 opacity-60" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12"></path></svg>
-                        <canvas id="pdfPreview" class="hidden max-h-32 rounded-lg shadow-sm w-auto mx-auto"></canvas>
-                        <p id="fileNameDisplay" class="text-xs opacity-60 font-medium">Tap to select document</p>
-                        <input type="file" id="fileInput" class="hidden" accept=".pdf,.doc,.docx,.jpg,.png">
+                    <div id="dropZone" class="input-field border-dashed rounded-xl p-5 text-center cursor-pointer hover-bg-inner transition-all flex flex-col items-center justify-center gap-2 relative overflow-hidden h-40" onclick="if(event.target.closest('#carouselLeftBtn') || event.target.closest('#carouselRightBtn')) return; document.getElementById('fileInput').click()">
+                        <!-- Initial State -->
+                        <div id="dropZoneInitial" class="flex flex-col items-center justify-center pointer-events-none transition-opacity duration-300">
+                            <svg id="uploadIcon" class="w-6 h-6 opacity-60 mb-2" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12"></path></svg>
+                            <p class="text-xs opacity-60 font-medium">Tap to select document(s)</p>
+                        </div>
+                        
+                        <!-- Carousel State -->
+                        <div id="pdfCarouselContainer" class="hidden absolute inset-0 w-full h-full flex items-center">
+                            <!-- Left Arrow -->
+                            <button type="button" id="carouselLeftBtn" class="absolute left-2 z-20 w-8 h-8 rounded-full bg-black/20 backdrop-blur border border-white/10 shadow-lg flex items-center justify-center hover:bg-black/30 transition-transform scale-0" onclick="scrollCarousel(-1); event.stopPropagation();">
+                                <svg class="w-4 h-4 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="3" d="M15 19l-7-7 7-7"></path></svg>
+                            </button>
+                            
+                            <div id="pdfCarousel" class="flex overflow-x-auto snap-x snap-mandatory gap-4 w-full px-[25%] h-full items-center [&::-webkit-scrollbar]:hidden scroll-smooth">
+                                <!-- Populated by JS -->
+                            </div>
+
+                            <!-- Right Arrow -->
+                            <button type="button" id="carouselRightBtn" class="absolute right-2 z-20 w-8 h-8 rounded-full bg-black/20 backdrop-blur border border-white/10 shadow-lg flex items-center justify-center hover:bg-black/30 transition-transform scale-0" onclick="scrollCarousel(1); event.stopPropagation();">
+                                <svg class="w-4 h-4 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="3" d="M9 5l7 7-7 7"></path></svg>
+                            </button>
+                        </div>
+                        <input type="file" id="fileInput" class="hidden" accept=".pdf,.doc,.docx,.jpg,.png" multiple>
                     </div>
                 </div>
 
-                <div class="glass-card p-5 flex flex-col gap-4 shadow-lg">
+                <div class="glass-card p-5 flex flex-col gap-4 shadow-lg relative">
+                    <!-- Settings Header for Multiple Files -->
+                    <div class="flex items-center justify-between border-b border-app pb-3 mb-1">
+                        <div class="flex flex-col overflow-hidden max-w-[60%]">
+                            <span class="text-[10px] font-bold opacity-50 uppercase tracking-widest">Settings for</span>
+                            <span id="currentSettingsFilename" class="text-sm font-bold truncate text-emerald-400">None selected</span>
+                        </div>
+                        <div class="flex items-center gap-3">
+                            <label class="flex items-center cursor-pointer relative">
+                                <input type="checkbox" id="applyToAllToggle" class="sr-only peer" checked>
+                                <div class="w-9 h-5 bg-gray-200 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all [.theme-dark_&]:bg-gray-700 peer-checked:bg-emerald-500"></div>
+                                <span class="ml-2 text-[10px] font-bold opacity-70 uppercase tracking-wider">Apply All</span>
+                            </label>
+                        </div>
+                    </div>
                     <div class="flex justify-between items-center">
                         <span class="text-sm font-semibold opacity-80">Color Mode</span>
                         <div class="relative flex bg-pill rounded-xl p-1 w-[160px]">
@@ -391,11 +424,11 @@ body {
                             <div class="absolute inset-y-1 left-1 w-[calc(50%-4px)] animated-glow-bg rounded-lg transition-transform duration-300 ease-[cubic-bezier(0.4,0,0.2,1)]" id="pill-colorMode"></div>
                             
                             <label class="flex-1 text-center relative z-10 cursor-pointer">
-                                <input type="radio" name="colorMode" value="B&W" checked onchange="calculateUIEstimate(); document.getElementById('pill-colorMode').style.transform='translateX(0)'" class="hidden peer">
+                                <input type="radio" name="colorMode" value="B&W" checked onchange="updateCurrentSettings(); document.getElementById('pill-colorMode').style.transform='translateX(0)'" class="hidden peer">
                                 <span class="block py-2 text-[11px] font-bold text-muted peer-checked:text-main transition-colors">B&W (₹1)</span>
                             </label>
                             <label class="flex-1 text-center relative z-10 cursor-pointer">
-                                <input type="radio" name="colorMode" value="Color" onchange="calculateUIEstimate(); document.getElementById('pill-colorMode').style.transform='translateX(100%)'" class="hidden peer">
+                                <input type="radio" name="colorMode" value="Color" onchange="updateCurrentSettings(); document.getElementById('pill-colorMode').style.transform='translateX(100%)'" class="hidden peer">
                                 <span class="block py-2 text-[11px] font-bold text-muted peer-checked:text-main transition-colors">Color (₹10)</span>
                             </label>
                         </div>
@@ -407,11 +440,11 @@ body {
                             <div class="absolute inset-y-1 left-1 w-[calc(50%-4px)] animated-glow-bg rounded-lg transition-transform duration-300 ease-[cubic-bezier(0.4,0,0.2,1)]" id="pill-paperSize"></div>
                             
                             <label class="flex-1 text-center relative z-10 cursor-pointer">
-                                <input type="radio" name="paperSize" value="A4" checked onchange="calculateUIEstimate(); document.getElementById('pill-paperSize').style.transform='translateX(0)'" class="hidden peer">
+                                <input type="radio" name="paperSize" value="A4" checked onchange="updateCurrentSettings(); document.getElementById('pill-paperSize').style.transform='translateX(0)'" class="hidden peer">
                                 <span class="block py-2 text-xs font-bold text-muted peer-checked:text-main transition-colors">A4</span>
                             </label>
                             <label class="flex-1 text-center relative z-10 cursor-pointer">
-                                <input type="radio" name="paperSize" value="A3" onchange="calculateUIEstimate(); document.getElementById('pill-paperSize').style.transform='translateX(100%)'" class="hidden peer">
+                                <input type="radio" name="paperSize" value="A3" onchange="updateCurrentSettings(); document.getElementById('pill-paperSize').style.transform='translateX(100%)'" class="hidden peer">
                                 <span class="block py-2 text-xs font-bold text-muted peer-checked:text-main transition-colors">A3</span>
                             </label>
                         </div>
@@ -423,11 +456,11 @@ body {
                             <div class="absolute inset-y-1 left-1 w-[calc(50%-4px)] animated-glow-bg rounded-lg transition-transform duration-300 ease-[cubic-bezier(0.4,0,0.2,1)]" id="pill-sides"></div>
                             
                             <label class="flex-1 text-center relative z-10 cursor-pointer">
-                                <input type="radio" name="sides" value="Single" checked onchange="calculateUIEstimate(); document.getElementById('pill-sides').style.transform='translateX(0)'" class="hidden peer">
+                                <input type="radio" name="sides" value="Single" checked onchange="updateCurrentSettings(); document.getElementById('pill-sides').style.transform='translateX(0)'" class="hidden peer">
                                 <span class="block py-2 text-xs font-bold text-muted peer-checked:text-main transition-colors">Single</span>
                             </label>
                             <label class="flex-1 text-center relative z-10 cursor-pointer">
-                                <input type="radio" name="sides" value="Double" onchange="calculateUIEstimate(); document.getElementById('pill-sides').style.transform='translateX(100%)'" class="hidden peer">
+                                <input type="radio" name="sides" value="Double" onchange="updateCurrentSettings(); document.getElementById('pill-sides').style.transform='translateX(100%)'" class="hidden peer">
                                 <span class="block py-2 text-xs font-bold text-muted peer-checked:text-main transition-colors">Double</span>
                             </label>
                         </div>
@@ -436,7 +469,7 @@ body {
                     <div class="flex justify-between items-center">
                         <span class="text-sm font-semibold opacity-80">Copies</span>
                         <div class="relative w-16">
-                            <input type="number" id="copiesOption" value="1" min="1" class="peer w-full bg-transparent border-0 border-b-2 border-app text-center text-lg font-black text-main outline-none transition-colors pb-1 relative z-10 focus:border-transparent" oninput="calculateUIEstimate()">
+                            <input type="number" id="copiesOption" value="1" min="1" class="peer w-full bg-transparent border-0 border-b-2 border-app text-center text-lg font-black text-main outline-none transition-colors pb-1 relative z-10 focus:border-transparent" oninput="updateCurrentSettings()">
                             <!-- Glowing animated line -->
                             <div class="absolute bottom-0 left-0 w-full h-[2px] animated-border-glow opacity-0 peer-focus:opacity-100 transition-opacity z-0 rounded-full"></div>
                         </div>
@@ -478,10 +511,30 @@ body {
     </div>
 </div> <!-- End of app-container -->
 
+<!-- Reprint Modal -->
+<div id="reprintModal" class="fixed inset-0 z-50 flex items-center justify-center opacity-0 pointer-events-none transition-opacity duration-300 backdrop-blur-md bg-black/40">
+    <div class="glass-card p-6 rounded-2xl border border-white/20 shadow-2xl w-[90%] max-w-sm transform scale-95 transition-transform duration-300 ease-out flex flex-col gap-4" id="reprintModalContent">
+        <div class="flex justify-between items-center border-b border-app pb-3">
+            <h3 class="text-lg font-bold">Reprint Job</h3>
+            <button onclick="closeReprintModal()" class="opacity-50 hover:opacity-100"><svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path></svg></button>
+        </div>
+        <p class="text-sm opacity-80" id="reprintModalText">Do you want to reprint <span class="font-bold text-emerald-400 truncate block mt-1" id="reprintModalFilename"></span> using the exact same configuration as before?</p>
+        <div class="flex flex-col gap-2 mt-2">
+            <button onclick="reprintWithOldSettings()" class="w-full btn-gradient py-2.5 rounded-xl font-bold text-sm">Yes, Print Now</button>
+            <button onclick="reprintWithNewSettings()" class="w-full bg-black/10 hover:bg-black/20 [.theme-dark_&]:bg-white/10 [.theme-dark_&]:hover:bg-white/20 border border-black/20 [.theme-dark_&]:border-white/20 py-2.5 rounded-xl font-bold text-sm transition-colors">No, Change Settings</button>
+        </div>
+    </div>
+</div>
+
 <script>
     const API_BASE_URL = window.location.origin;
-    let selectedFile = null;
-    let selectedFilePageCount = 1;
+    let selectedFiles = [];
+    let filesSettings = {};
+    let currentFileIndex = 0;
+    
+    let activeReprintJobId = null;
+    let activeReprintFileUrl = null;
+
     let googleAuthToken = localStorage.getItem('googleAuthToken');
     let currentUser = null;
 
@@ -508,16 +561,17 @@ body {
         }, 3000);
     }
 
-    // Helper to clear the file input
     function clearFileInput() {
-        selectedFile = null;
-        selectedFilePageCount = 1;
+        selectedFiles = [];
+        filesSettings = {};
+        currentFileIndex = 0;
+        activeReprintJobId = null;
+        activeReprintFileUrl = null;
         document.getElementById('fileInput').value = '';
-        document.getElementById('fileNameDisplay').textContent = 'Tap to select document';
-        document.getElementById('fileNameDisplay').classList.remove('opacity-100', 'font-bold', 'text-emerald-300');
-        document.getElementById('fileNameDisplay').classList.add('opacity-60');
-        document.getElementById('uploadIcon').classList.remove('hidden');
-        document.getElementById('pdfPreview').classList.add('hidden');
+        
+        document.getElementById('dropZoneInitial').classList.remove('hidden');
+        document.getElementById('pdfCarouselContainer').classList.add('hidden');
+        document.getElementById('currentSettingsFilename').textContent = 'None selected';
         document.getElementById('uiCostEstimate').textContent = '₹0';
         document.getElementById('uiTimeEstimate').textContent = '< 1 MIN';
     }
@@ -595,80 +649,174 @@ body {
     const fileInput = document.getElementById('fileInput');
     const fileNameDisplay = document.getElementById('fileNameDisplay');
     document.getElementById('dropZone').addEventListener('click', () => fileInput.click());
-    
-    fileInput.addEventListener('change', async (e) => {
-        selectedFile = e.target.files[0];
-        if (selectedFile) {
-            const name = selectedFile.name;
-            fileNameDisplay.textContent = name.length > 35 ? name.substring(0, 32) + '...' : name;
-            fileNameDisplay.classList.remove('opacity-60');
-            fileNameDisplay.classList.add('opacity-100', 'font-bold', 'text-emerald-300');
-            document.getElementById('uploadIcon').classList.add('hidden');
+    document.getElementById('fileInput').addEventListener('change', async (e) => {
+        if (e.target.files.length > 0) {
+            selectedFiles = Array.from(e.target.files);
+            filesSettings = {};
+            activeReprintJobId = null;
+            activeReprintFileUrl = null;
             
-            // Default to 1 page for images/docs, attempt to read actual pages for PDFs
-            selectedFilePageCount = 1; 
-            
-            if (selectedFile.type === 'application/pdf' || name.toLowerCase().endsWith('.pdf')) {
-                document.getElementById('uiCostEstimate').textContent = "Counting...";
-                try {
-                    const arrayBuffer = await selectedFile.arrayBuffer();
-                    const pdfDoc = await PDFLib.PDFDocument.load(arrayBuffer, { ignoreEncryption: true });
-                    selectedFilePageCount = pdfDoc.getPageCount();
-                    
-                    // Render PDF.js preview
-                    const loadingTask = pdfjsLib.getDocument({ data: new Uint8Array(arrayBuffer) });
-                    const pdf = await loadingTask.promise;
-                    const page = await pdf.getPage(1);
-                    const viewport = page.getViewport({ scale: 1.0 });
-                    const canvas = document.getElementById('pdfPreview');
-                    const context = canvas.getContext('2d');
-                    canvas.height = viewport.height;
-                    canvas.width = viewport.width;
-                    await page.render({ canvasContext: context, viewport: viewport }).promise;
-                    canvas.classList.remove('hidden');
-                } catch (err) {
-                    console.error("Could not parse PDF page count or preview:", err);
-                }
-            } else if (selectedFile.type.startsWith('image/')) {
-                const canvas = document.getElementById('pdfPreview');
-                const context = canvas.getContext('2d');
-                const img = new Image();
-                img.onload = () => {
-                    canvas.width = img.width;
-                    canvas.height = img.height;
-                    context.drawImage(img, 0, 0);
-                    canvas.classList.remove('hidden');
-                }
-                img.src = URL.createObjectURL(selectedFile);
-            } else {
-                document.getElementById('pdfPreview').classList.add('hidden');
+            for(let file of selectedFiles) {
+                filesSettings[file.name] = { color: 'B&W', size: 'A4', sides: 'Single', copies: 1, pageCount: 1 };
             }
             
-            calculateUIEstimate();
+            document.getElementById('dropZoneInitial').classList.add('hidden');
+            document.getElementById('pdfCarouselContainer').classList.remove('hidden');
+            
+            const carousel = document.getElementById('pdfCarousel');
+            carousel.innerHTML = '';
+            
+            for (let i = 0; i < selectedFiles.length; i++) {
+                const file = selectedFiles[i];
+                const div = document.createElement('div');
+                div.className = "snap-center shrink-0 w-32 flex flex-col items-center justify-center cursor-pointer opacity-50 transition-all duration-300";
+                div.id = `carousel-item-${i}`;
+                div.onclick = (ev) => { ev.stopPropagation(); selectFileIndex(i); };
+                
+                const canvas = document.createElement('canvas');
+                canvas.className = "max-h-24 rounded-lg shadow-sm w-auto mx-auto border border-white/10";
+                canvas.id = `preview-${i}`;
+                div.appendChild(canvas);
+                
+                const p = document.createElement('p');
+                p.className = "text-[10px] text-center truncate w-full mt-2 font-medium opacity-80";
+                p.textContent = file.name;
+                div.appendChild(p);
+                
+                carousel.appendChild(div);
+                
+                if (file.type === 'application/pdf' || file.name.toLowerCase().endsWith('.pdf')) {
+                    try {
+                        const arrayBuffer = await file.arrayBuffer();
+                        const pdfDoc = await PDFLib.PDFDocument.load(arrayBuffer, { ignoreEncryption: true });
+                        filesSettings[file.name].pageCount = pdfDoc.getPageCount();
+                        
+                        const loadingTask = pdfjsLib.getDocument({ data: new Uint8Array(arrayBuffer) });
+                        const pdf = await loadingTask.promise;
+                        const page = await pdf.getPage(1);
+                        const viewport = page.getViewport({ scale: 1.0 });
+                        const context = canvas.getContext('2d');
+                        canvas.height = viewport.height;
+                        canvas.width = viewport.width;
+                        await page.render({ canvasContext: context, viewport: viewport }).promise;
+                    } catch (err) { console.error("PDF preview err:", err); }
+                } else if (file.type.startsWith('image/')) {
+                    const context = canvas.getContext('2d');
+                    const img = new Image();
+                    img.onload = () => {
+                        canvas.width = img.width;
+                        canvas.height = img.height;
+                        context.drawImage(img, 0, 0, canvas.width, canvas.height);
+                    }
+                    img.src = URL.createObjectURL(file);
+                }
+            }
+            
+            if (selectedFiles.length > 1) {
+                document.getElementById('carouselLeftBtn').classList.remove('scale-0');
+                document.getElementById('carouselRightBtn').classList.remove('scale-0');
+            } else {
+                document.getElementById('carouselLeftBtn').classList.add('scale-0');
+                document.getElementById('carouselRightBtn').classList.add('scale-0');
+            }
+            
+            selectFileIndex(0);
         }
     });
 
-    function calculateUIEstimate() {
-        const copies = parseInt(document.getElementById('copiesOption').value) || 1;
+    function selectFileIndex(index) {
+        if(index < 0 || index >= selectedFiles.length) return;
+        currentFileIndex = index;
+        const file = selectedFiles[index];
+        
+        for(let i=0; i<selectedFiles.length; i++) {
+            const item = document.getElementById(`carousel-item-${i}`);
+            if(i === index) {
+                item.classList.remove('opacity-50', 'scale-90');
+                item.classList.add('opacity-100', 'scale-100');
+                item.scrollIntoView({ behavior: 'smooth', block: 'nearest', inline: 'center' });
+            } else {
+                item.classList.remove('opacity-100', 'scale-100');
+                item.classList.add('opacity-50', 'scale-90');
+            }
+        }
+        
+        const name = file.name;
+        document.getElementById('currentSettingsFilename').textContent = name.length > 30 ? name.substring(0, 27) + '...' : name;
+        
+        const s = filesSettings[name];
+        document.querySelector(`input[name="colorMode"][value="${s.color}"]`).checked = true;
+        document.querySelector(`input[name="paperSize"][value="${s.size}"]`).checked = true;
+        document.querySelector(`input[name="sides"][value="${s.sides}"]`).checked = true;
+        document.getElementById('copiesOption').value = s.copies;
+        
+        document.getElementById('pill-colorMode').style.transform = s.color === 'B&W' ? 'translateX(0)' : 'translateX(100%)';
+        document.getElementById('pill-paperSize').style.transform = s.size === 'A4' ? 'translateX(0)' : 'translateX(100%)';
+        document.getElementById('pill-sides').style.transform = s.sides === 'Single' ? 'translateX(0)' : 'translateX(100%)';
+        
+        calculateUIEstimate();
+    }
+
+    function scrollCarousel(dir) {
+        selectFileIndex(currentFileIndex + dir);
+    }
+
+    function updateCurrentSettings() {
+        if(selectedFiles.length === 0 && !activeReprintJobId) return;
+        
         const colorMode = document.querySelector('input[name="colorMode"]:checked').value;
         const paperSize = document.querySelector('input[name="paperSize"]:checked').value;
         const sides = document.querySelector('input[name="sides"]:checked').value;
+        const copies = parseInt(document.getElementById('copiesOption').value) || 1;
         
-        // --- Calculate Cost ---
-        const rate = (colorMode === "Color") ? 10 : 1;
-        const sizeMultiplier = (paperSize === "A3") ? 2 : 1;
-        const totalEstimate = rate * sizeMultiplier * copies * selectedFilePageCount;
+        const applyToAll = document.getElementById('applyToAllToggle').checked;
         
-        // --- Calculate Individual Job Time ---
-        let timePerPage = 2; // base
-        if (colorMode === "Color") timePerPage += 2;
-        if (paperSize === "A3") timePerPage += 3;
-        if (sides === "Double") timePerPage += 3;
+        if (activeReprintJobId) {
+            filesSettings["reprint"].color = colorMode;
+            filesSettings["reprint"].size = paperSize;
+            filesSettings["reprint"].sides = sides;
+            filesSettings["reprint"].copies = copies;
+        } else {
+            const currentFileName = selectedFiles[currentFileIndex].name;
+            if(applyToAll) {
+                for(let name in filesSettings) {
+                    filesSettings[name].color = colorMode;
+                    filesSettings[name].size = paperSize;
+                    filesSettings[name].sides = sides;
+                    filesSettings[name].copies = copies;
+                }
+            } else {
+                filesSettings[currentFileName].color = colorMode;
+                filesSettings[currentFileName].size = paperSize;
+                filesSettings[currentFileName].sides = sides;
+                filesSettings[currentFileName].copies = copies;
+            }
+        }
+        calculateUIEstimate();
+    }
+
+    function calculateUIEstimate() {
+        if(selectedFiles.length === 0 && !activeReprintJobId) return;
         
-        const durationSecs = 5 + (selectedFilePageCount * copies * timePerPage);
+        let totalEstimate = 0;
+        let totalTimeSecs = 0;
+        
+        for(let name in filesSettings) {
+            const s = filesSettings[name];
+            const rate = (s.color === "Color") ? 10 : 1;
+            const sizeMultiplier = (s.size === "A3") ? 2 : 1;
+            totalEstimate += rate * sizeMultiplier * s.copies * s.pageCount;
+            
+            let timePerPage = 2;
+            if (s.color === "Color") timePerPage += 2;
+            if (s.size === "A3") timePerPage += 3;
+            if (s.sides === "Double") timePerPage += 3;
+            totalTimeSecs += 5 + (s.pageCount * s.copies * timePerPage);
+        }
+        
         let timeStr = "< 1 MIN";
-        if (durationSecs >= 60) {
-            timeStr = `~ ${Math.floor(durationSecs / 60)} MINS`;
+        if (totalTimeSecs >= 60) {
+            timeStr = `~ ${Math.floor(totalTimeSecs / 60)} MINS`;
         }
         
         document.getElementById('uiCostEstimate').textContent = `₹${totalEstimate}`;
@@ -695,7 +843,7 @@ body {
                 return;
             }
 
-            if (!selectedFile) {
+            if (selectedFiles.length === 0 && !activeReprintJobId) {
                 alert('Please select a document first.');
                 return;
             }
@@ -705,27 +853,32 @@ body {
             btn.innerHTML = '<span class="animate-pulse flex items-center justify-center gap-2"><svg class="animate-spin h-4 w-4" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path></svg> Processing...</span>';
             btn.disabled = true;
             
-            const settings = {
-                color: document.querySelector('input[name="colorMode"]:checked').value,
-                copies: parseInt(document.getElementById('copiesOption').value) || 1,
-                size: document.querySelector('input[name="paperSize"]:checked').value,
-                sides: document.querySelector('input[name="sides"]:checked').value,
-                pageCount: selectedFilePageCount,
-                timestamp_ms: Date.now()
-            };
-
-            const formData = new FormData();
-            formData.append('file', selectedFile);
-            formData.append('settings', JSON.stringify(settings));
-
             try {
-                const response = await fetch('/upload-pending', {
-                    method: 'POST',
-                    headers: {
-                        'Authorization': `Bearer ${googleAuthToken}`
-                    },
-                    body: formData
-                });
+                let response;
+                if (activeReprintJobId) {
+                    response = await fetch(`/reprint-with-settings/${activeReprintJobId}`, {
+                        method: 'POST',
+                        headers: {
+                            'Authorization': `Bearer ${googleAuthToken}`,
+                            'Content-Type': 'application/json'
+                        },
+                        body: JSON.stringify(filesSettings["reprint"])
+                    });
+                } else {
+                    const formData = new FormData();
+                    for(let file of selectedFiles) {
+                        formData.append('files', file);
+                    }
+                    formData.append('settings', JSON.stringify(filesSettings));
+
+                    response = await fetch('/upload-pending', {
+                        method: 'POST',
+                        headers: {
+                            'Authorization': `Bearer ${googleAuthToken}`
+                        },
+                        body: formData
+                    });
+                }
                 
                 const data = await response.json();
                 
@@ -749,6 +902,100 @@ body {
                 btn.disabled = false;
             }
         });
+
+    function openReprintModal(jobId, fileName, oldSettingsStr) {
+        let oldSettings = {};
+        try { oldSettings = JSON.parse(oldSettingsStr); } catch(e) {}
+        
+        activeReprintJobId = jobId;
+        document.getElementById('reprintModalFilename').textContent = fileName;
+        
+        // Store for "Change Settings"
+        filesSettings = { "reprint": oldSettings };
+        
+        const modal = document.getElementById('reprintModal');
+        const modalContent = document.getElementById('reprintModalContent');
+        
+        modal.classList.remove('opacity-0', 'pointer-events-none');
+        modalContent.classList.remove('scale-95');
+        modalContent.classList.add('scale-100');
+    }
+
+    function closeReprintModal() {
+        const modal = document.getElementById('reprintModal');
+        const modalContent = document.getElementById('reprintModalContent');
+        
+        modal.classList.add('opacity-0', 'pointer-events-none');
+        modalContent.classList.remove('scale-100');
+        modalContent.classList.add('scale-95');
+    }
+
+    async function reprintWithOldSettings() {
+        if(!activeReprintJobId) return;
+        
+        // Direct redirect without loading into UI
+        try {
+            const res = await fetch(`/reprint/${activeReprintJobId}`, {
+                method: 'POST',
+                headers: { 'Authorization': `Bearer ${googleAuthToken}` }
+            });
+            const data = await res.json();
+            if (res.ok && data.status === 'success') {
+                window.location.href = data.redirectUrl;
+            } else {
+                alert('❌ Reprint failed: ' + (data.message || 'Unknown error'));
+            }
+        } catch(e) {
+            alert('❌ Network error during reprint');
+        }
+        closeReprintModal();
+    }
+
+    function reprintWithNewSettings() {
+        // Load into main UI
+        closeReprintModal();
+        
+        selectedFiles = []; // Clear actual files
+        document.getElementById('dropZoneInitial').classList.add('hidden');
+        document.getElementById('pdfCarouselContainer').classList.remove('hidden');
+        
+        // Create mock carousel for 1 file
+        const carousel = document.getElementById('pdfCarousel');
+        carousel.innerHTML = '';
+        
+        const div = document.createElement('div');
+        div.className = "snap-center shrink-0 w-32 flex flex-col items-center justify-center opacity-100 transition-all duration-300 scale-100";
+        
+        const canvas = document.createElement('canvas');
+        canvas.className = "h-24 rounded-lg shadow-sm w-auto mx-auto border border-white/10 bg-inner flex items-center justify-center";
+        
+        const p = document.createElement('p');
+        p.className = "text-[10px] text-center truncate w-full mt-2 font-medium opacity-80";
+        p.textContent = document.getElementById('reprintModalFilename').textContent;
+        
+        div.appendChild(canvas);
+        div.appendChild(p);
+        carousel.appendChild(div);
+        
+        document.getElementById('carouselLeftBtn').classList.add('scale-0');
+        document.getElementById('carouselRightBtn').classList.add('scale-0');
+        
+        // Set UI inputs
+        const s = filesSettings["reprint"];
+        document.getElementById('currentSettingsFilename').textContent = p.textContent.length > 30 ? p.textContent.substring(0,27)+'...' : p.textContent;
+        
+        if (s.color) document.querySelector(`input[name="colorMode"][value="${s.color}"]`).checked = true;
+        if (s.size) document.querySelector(`input[name="paperSize"][value="${s.size}"]`).checked = true;
+        if (s.sides) document.querySelector(`input[name="sides"][value="${s.sides}"]`).checked = true;
+        if (s.copies) document.getElementById('copiesOption').value = s.copies;
+        
+        document.getElementById('pill-colorMode').style.transform = s.color === 'B&W' ? 'translateX(0)' : 'translateX(100%)';
+        document.getElementById('pill-paperSize').style.transform = s.size === 'A4' ? 'translateX(0)' : 'translateX(100%)';
+        document.getElementById('pill-sides').style.transform = s.sides === 'Single' ? 'translateX(0)' : 'translateX(100%)';
+        
+        calculateUIEstimate();
+        window.scrollTo({ top: 0, behavior: 'smooth' });
+    }
 
     // Run auth check on load
     window.addEventListener('load', () => {

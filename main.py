@@ -1,6 +1,6 @@
 from contextlib import asynccontextmanager
 
-from fastapi import FastAPI, Depends, File, Form, UploadFile, HTTPException
+from fastapi import FastAPI, Depends, File, Form, UploadFile, HTTPException, Body
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 from fastapi.responses import FileResponse
@@ -259,97 +259,102 @@ async def upload_pending(
     request: Request,
     user: dict = Depends(get_current_user),
     settings: str = Form(...),
-    file: UploadFile = File(...),
+    files: List[UploadFile] = File(...),
     db: Session = Depends(get_db)
 ):
     user_name = user["name"]
     user_email = user["email"]
 
-    # 1. Parse JSON settings
+    # 1. Parse JSON settings mapping { filename: { settings } }
     try:
-        settings = json.loads(settings)
-        if isinstance(settings, str): 
-            settings = json.loads(settings)
+        settings_map = json.loads(settings)
+        if isinstance(settings_map, str): 
+            settings_map = json.loads(settings_map)
     except:
-        raise HTTPException(status_code=400, detail="Invalid JSON format")
-
-    # 2. Upload to Azure Blob Storage
-    safe_filename = "".join([c for c in file.filename if c.isalnum() or c in " .-_"]).strip()
-    unique_filename = f"{uuid.uuid4()}_{safe_filename}"
-    
-    file_url = ""
-    if blob_service_client:
-        try:
-            blob_client = blob_service_client.get_blob_client(container=AZURE_CONTAINER_NAME, blob=unique_filename)
-            # Upload the incoming file stream directly without saving locally!
-            blob_client.upload_blob(
-                file.file, 
-                content_settings=ContentSettings(content_type=file.content_type)
-            )
-            
-            # Generate a Secure SAS Token valid for 30 days
-            sas_token = generate_blob_sas(
-                account_name=blob_service_client.account_name,
-                container_name=AZURE_CONTAINER_NAME,
-                blob_name=unique_filename,
-                account_key=blob_service_client.credential.account_key,
-                permission=BlobSasPermissions(read=True),
-                expiry=datetime.now(timezone.utc) + timedelta(days=30)
-            )
-            file_url = f"{blob_client.url}?{sas_token}"
-        except Exception as e:
-            print(f"Azure Upload Error: {e}")
-            raise HTTPException(status_code=500, detail="Cloud Storage Upload Failed")
-    else:
-        # Fallback to local storage if Azure is not configured
-        file_path = os.path.join(UPLOAD_DIR, unique_filename)
-        try:
-            with open(file_path, "wb") as buffer:
-                buffer.write(file.file.read())
-            file_url = f"/uploads/{unique_filename}"
-        except Exception as e:
-            raise HTTPException(status_code=500, detail="Local Storage Upload Failed")
-
-    # 3. Process Metadata & Math (using frontend page count)
-    page_count = int(settings.get("pageCount", 1))
-    
-    # B&W = 1, Color = 10
-    color_val = settings.get("color", "B&W")
-    base_rate = 10 if color_val == "Color" else 1
-    
-    paper_size = settings.get("size", "A4")
-    size_multiplier = 2 if paper_size == "A3" else 1
-    
-    copies = int(settings.get("copies", 1))
-    
-    # ACTUAL TOTAL COST MATH
-    total_cost = float(base_rate * size_multiplier * page_count * copies)
+        raise HTTPException(status_code=400, detail="Invalid JSON format for settings")
 
     transaction_id = f"TXN_{uuid.uuid4().hex[:16]}"
     merchant_user_id = f"USER_{user_email.replace('@', '_').replace('.', '_')}"
+    
+    batch_total_cost = 0.0
+    db_jobs = []
 
-    # 4. Save to Database
+    # 2. Process each file
+    for file in files:
+        safe_filename = "".join([c for c in file.filename if c.isalnum() or c in " .-_"]).strip()
+        unique_filename = f"{uuid.uuid4()}_{safe_filename}"
+        
+        file_url = ""
+        if blob_service_client:
+            try:
+                blob_client = blob_service_client.get_blob_client(container=AZURE_CONTAINER_NAME, blob=unique_filename)
+                blob_client.upload_blob(
+                    file.file, 
+                    content_settings=ContentSettings(content_type=file.content_type)
+                )
+                
+                sas_token = generate_blob_sas(
+                    account_name=blob_service_client.account_name,
+                    container_name=AZURE_CONTAINER_NAME,
+                    blob_name=unique_filename,
+                    account_key=blob_service_client.credential.account_key,
+                    permission=BlobSasPermissions(read=True),
+                    expiry=datetime.now(timezone.utc) + timedelta(days=30)
+                )
+                file_url = f"{blob_client.url}?{sas_token}"
+            except Exception as e:
+                print(f"Azure Upload Error for {file.filename}: {e}")
+                raise HTTPException(status_code=500, detail="Cloud Storage Upload Failed")
+        else:
+            file_path = os.path.join(UPLOAD_DIR, unique_filename)
+            try:
+                with open(file_path, "wb") as buffer:
+                    buffer.write(file.file.read())
+                file_url = f"/uploads/{unique_filename}"
+            except Exception as e:
+                raise HTTPException(status_code=500, detail="Local Storage Upload Failed")
+
+        # 3. Calculate Math for this specific file
+        file_settings = settings_map.get(file.filename, {})
+        page_count = int(file_settings.get("pageCount", 1))
+        
+        color_val = file_settings.get("color", "B&W")
+        base_rate = 10 if color_val == "Color" else 1
+        
+        paper_size = file_settings.get("size", "A4")
+        size_multiplier = 2 if paper_size == "A3" else 1
+        
+        copies = int(file_settings.get("copies", 1))
+        
+        file_total_cost = float(base_rate * size_multiplier * page_count * copies)
+        batch_total_cost += file_total_cost
+        
+        # 4. Save to Database
+        try:
+            db_job = models.PrintJob(
+                user_name=user_name,
+                user_email=user_email,
+                file_url=file_url,
+                page_count=page_count,
+                page_settings=file_settings,
+                status="Queued",
+                total_cost=file_total_cost,
+                transaction_id=transaction_id,
+                timestamp=datetime.now() 
+            )
+            db.add(db_job)
+            db_jobs.append(db_job)
+        except Exception as e:
+            print(f"DB Error: {e}")
+            return {"status": "error", "message": f"Database Save Failed: {e}"}
+
     try:
-        db_job = models.PrintJob(
-            user_name=user_name,
-            user_email=user_email,
-            file_url=file_url,
-            page_count=page_count,
-            page_settings=settings,
-            status="Queued",  # Kept as queued, since this is simple
-            total_cost=total_cost,
-            transaction_id=transaction_id,
-            timestamp=datetime.now() 
-        )
-        db.add(db_job)
         db.commit()
-        db.refresh(db_job)
     except Exception as e:
-        print(f"DB Error: {e}")
-        return {"status": "error", "message": f"Database Save Failed: {e}"}
+        return {"status": "error", "message": f"Database Commit Failed: {e}"}
 
     # PhonePe Checkout Request
-    amount_in_paise = int(total_cost * 100)
+    amount_in_paise = int(batch_total_cost * 100)
     base_url = str(request.base_url).rstrip("/")
     if "azurewebsites.net" in base_url and base_url.startswith("http://"):
         base_url = base_url.replace("http://", "https://")
@@ -419,16 +424,18 @@ async def payment_callback(transactionId: str = Form(...), code: str = Form(...)
         response = requests.get(status_url, headers=headers)
         status_data = response.json()
         
-        job = db.query(models.PrintJob).filter(models.PrintJob.transaction_id == txn_id).first()
+        jobs = db.query(models.PrintJob).filter(models.PrintJob.transaction_id == txn_id).all()
         
         if status_data.get("success") and status_data.get("code") == "PAYMENT_SUCCESS":
-            if job:
+            for job in jobs:
                 job.status = "Paid"
+            if jobs:
                 db.commit()
             return RedirectResponse(url=f"/?success=true", status_code=303)
         else:
-            if job:
+            for job in jobs:
                 job.status = "Failed"
+            if jobs:
                 db.commit()
             return RedirectResponse(url="/?success=false&reason=Payment_Failed", status_code=303)
     except Exception as e:
@@ -456,6 +463,147 @@ def complete_job(job_id: int, db: Session = Depends(get_db)):
     job.status = "Completed"
     db.commit()
     return {"message": "done"}
+
+@app.get("/admin/analytics")
+def get_admin_analytics(db: Session = Depends(get_db)):
+    jobs = db.query(models.PrintJob).filter(models.PrintJob.status.in_(["Paid", "Completed"])).all()
+    total_revenue = sum(job.total_cost for job in jobs)
+    completed_jobs = [job for job in jobs if job.status == "Completed"]
+    
+    # Format for response
+    result = []
+    for job in completed_jobs:
+        result.append({
+            "id": job.id,
+            "user_name": job.user_name,
+            "user_email": job.user_email,
+            "file_url": job.file_url,
+            "page_count": job.page_count,
+            "page_settings": job.page_settings,
+            "status": job.status,
+            "total_cost": job.total_cost,
+            "timestamp": job.timestamp
+        })
+    return {"total_revenue": total_revenue, "completed_jobs": sorted(result, key=lambda x: x["timestamp"], reverse=True)}
+
+@app.post("/reprint/{job_id}")
+async def reprint_job(request: Request, job_id: int, user: dict = Depends(get_current_user), db: Session = Depends(get_db)):
+    old_job = db.query(models.PrintJob).filter(models.PrintJob.id == job_id, models.PrintJob.user_email == user["email"]).first()
+    if not old_job:
+        raise HTTPException(status_code=404, detail="Original job not found")
+
+    transaction_id = f"TXN_{uuid.uuid4().hex[:16]}"
+    merchant_user_id = f"USER_{user['email'].replace('@', '_').replace('.', '_')}"
+
+    new_job = models.PrintJob(
+        user_name=old_job.user_name,
+        user_email=old_job.user_email,
+        file_url=old_job.file_url,
+        page_count=old_job.page_count,
+        page_settings=old_job.page_settings,
+        status="Queued",
+        total_cost=old_job.total_cost,
+        transaction_id=transaction_id,
+        timestamp=datetime.now()
+    )
+    db.add(new_job)
+    db.commit()
+
+    amount_in_paise = int(new_job.total_cost * 100)
+    base_url = str(request.base_url).rstrip("/")
+    if "azurewebsites.net" in base_url and base_url.startswith("http://"):
+        base_url = base_url.replace("http://", "https://")
+    
+    payload = {
+        "merchantId": PHONEPE_MERCHANT_ID,
+        "merchantTransactionId": transaction_id,
+        "merchantUserId": merchant_user_id,
+        "amount": amount_in_paise,
+        "redirectUrl": f"{base_url}/payment/callback",
+        "redirectMode": "POST",
+        "callbackUrl": f"{base_url}/payment/callback",
+        "mobileNumber": "9999999999",
+        "paymentInstrument": {"type": "PAY_PAGE"}
+    }
+    
+    payload_json = json.dumps(payload)
+    base64_payload = base64.b64encode(payload_json.encode()).decode()
+    api_endpoint = "/pg/v1/pay"
+    string_to_hash = base64_payload + api_endpoint + PHONEPE_SALT_KEY
+    checksum = calculate_sha256_string(string_to_hash) + "###" + PHONEPE_SALT_INDEX
+    
+    headers = {"Content-Type": "application/json", "X-VERIFY": checksum}
+    phonepe_url = "https://api-preprod.phonepe.com/apis/pg-sandbox/pg/v1/pay" if PHONEPE_ENV == "UAT" else "https://api.phonepe.com/apis/hermes/pg/v1/pay"
+    
+    response = requests.post(phonepe_url, json={"request": base64_payload}, headers=headers)
+    response_data = response.json()
+    if response_data.get("success"):
+        return {"status": "success", "redirectUrl": response_data["data"]["instrumentResponse"]["redirectInfo"]["url"]}
+    return {"status": "error", "message": f"PhonePe rejected request: {response_data.get('code')}"}
+
+@app.post("/reprint-with-settings/{job_id}")
+async def reprint_with_settings(request: Request, job_id: int, settings: dict = Body(...), user: dict = Depends(get_current_user), db: Session = Depends(get_db)):
+    old_job = db.query(models.PrintJob).filter(models.PrintJob.id == job_id, models.PrintJob.user_email == user["email"]).first()
+    if not old_job:
+        raise HTTPException(status_code=404, detail="Original job not found")
+
+    # Math
+    page_count = old_job.page_count
+    color_val = settings.get("color", "B&W")
+    base_rate = 10 if color_val == "Color" else 1
+    paper_size = settings.get("size", "A4")
+    size_multiplier = 2 if paper_size == "A3" else 1
+    copies = int(settings.get("copies", 1))
+    total_cost = float(base_rate * size_multiplier * page_count * copies)
+
+    transaction_id = f"TXN_{uuid.uuid4().hex[:16]}"
+    merchant_user_id = f"USER_{user['email'].replace('@', '_').replace('.', '_')}"
+
+    new_job = models.PrintJob(
+        user_name=old_job.user_name,
+        user_email=old_job.user_email,
+        file_url=old_job.file_url,
+        page_count=page_count,
+        page_settings=settings,
+        status="Queued",
+        total_cost=total_cost,
+        transaction_id=transaction_id,
+        timestamp=datetime.now()
+    )
+    db.add(new_job)
+    db.commit()
+
+    amount_in_paise = int(total_cost * 100)
+    base_url = str(request.base_url).rstrip("/")
+    if "azurewebsites.net" in base_url and base_url.startswith("http://"):
+        base_url = base_url.replace("http://", "https://")
+    
+    payload = {
+        "merchantId": PHONEPE_MERCHANT_ID,
+        "merchantTransactionId": transaction_id,
+        "merchantUserId": merchant_user_id,
+        "amount": amount_in_paise,
+        "redirectUrl": f"{base_url}/payment/callback",
+        "redirectMode": "POST",
+        "callbackUrl": f"{base_url}/payment/callback",
+        "mobileNumber": "9999999999",
+        "paymentInstrument": {"type": "PAY_PAGE"}
+    }
+    
+    payload_json = json.dumps(payload)
+    base64_payload = base64.b64encode(payload_json.encode()).decode()
+    api_endpoint = "/pg/v1/pay"
+    string_to_hash = base64_payload + api_endpoint + PHONEPE_SALT_KEY
+    checksum = calculate_sha256_string(string_to_hash) + "###" + PHONEPE_SALT_INDEX
+    
+    headers = {"Content-Type": "application/json", "X-VERIFY": checksum}
+    phonepe_url = "https://api-preprod.phonepe.com/apis/pg-sandbox/pg/v1/pay" if PHONEPE_ENV == "UAT" else "https://api.phonepe.com/apis/hermes/pg/v1/pay"
+    
+    response = requests.post(phonepe_url, json={"request": base64_payload}, headers=headers)
+    response_data = response.json()
+    if response_data.get("success"):
+        return {"status": "success", "redirectUrl": response_data["data"]["instrumentResponse"]["redirectInfo"]["url"]}
+    return {"status": "error", "message": f"PhonePe rejected request: {response_data.get('code')}"}
 
 @app.get("/view/{filename}")
 def view_file(filename: str):

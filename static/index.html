@@ -609,7 +609,12 @@ body {
                     // Redirect to PhonePe payment page
                     window.location.href = data.redirectUrl;
                 } else {
-                    alert('❌ Error: ' + (data.message || 'Failed to create print job'));
+                    if (response.status === 401) {
+                        alert('❌ Session expired! Please sign out and sign in again.');
+                        handleSignOut();
+                    } else {
+                        alert('❌ Error: ' + (data.detail || data.message || 'Failed to create print job'));
+                    }
                     btn.innerHTML = originalText;
                     btn.disabled = false;
                 }

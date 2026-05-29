@@ -780,14 +780,14 @@ body {
             document.getElementById('batchSettingsHeader').classList.add('flex');
             document.getElementById('carouselLeftBtn').classList.remove('scale-0');
             document.getElementById('carouselRightBtn').classList.remove('scale-0');
-            carousel.classList.add('px-[25%]', 'justify-start');
+            carousel.classList.add('px-[calc(50%-64px)]', 'justify-start');
             carousel.classList.remove('justify-center');
         } else {
             document.getElementById('batchSettingsHeader').classList.add('hidden');
             document.getElementById('batchSettingsHeader').classList.remove('flex');
             document.getElementById('carouselLeftBtn').classList.add('scale-0');
             document.getElementById('carouselRightBtn').classList.add('scale-0');
-            carousel.classList.remove('px-[25%]', 'justify-start');
+            carousel.classList.remove('px-[calc(50%-64px)]', 'justify-start');
             carousel.classList.add('justify-center');
         }
     }
@@ -1284,5 +1284,26 @@ body {
         }
     }
 </script>
+
+<!-- Reprint Modal -->
+<div id="reprintModal" class="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm opacity-0 pointer-events-none transition-opacity duration-300">
+    <div id="reprintModalContent" class="glass-card w-full max-w-sm p-6 rounded-[2rem] shadow-2xl border border-app scale-95 transition-transform duration-300">
+        <h3 class="text-xl font-black tracking-tight mb-2">Reprint Document</h3>
+        <p class="text-sm font-medium opacity-80 mb-6">Would you like to reprint <br><span id="reprintModalFilename" class="text-emerald-400 font-bold truncate block w-full mt-1"></span><br>with the exact same settings, or change them?</p>
+        
+        <div class="flex flex-col gap-3">
+            <button type="button" onclick="reprintWithOldSettings()" class="w-full btn-gradient text-main font-bold py-3 rounded-xl text-sm shadow-lg border border-white/10 hover:brightness-110 transition-all">
+                Print with Old Settings
+            </button>
+            <button type="button" onclick="reprintWithNewSettings()" class="w-full bg-inner hover-bg-inner text-main border border-app font-bold py-3 rounded-xl text-sm shadow-sm transition-all">
+                Change Settings
+            </button>
+            <button type="button" onclick="closeReprintModal()" class="w-full mt-2 text-xs font-bold opacity-60 hover:opacity-100 transition-opacity">
+                Cancel
+            </button>
+        </div>
+    </div>
+</div>
+
 </body>
 </html>

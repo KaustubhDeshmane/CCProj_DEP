@@ -5,7 +5,11 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Cloud Print Queue</title>
     <script src="https://cdn.tailwindcss.com"></script>
-    <script src="https://unpkg.com/pdf-lib/dist/pdf-lib.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
+    <script>
+        pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
+    </script>
+    <script src="https://unpkg.com/pdf-lib@1.17.1/dist/pdf-lib.min.js"></script>
     <script src="https://accounts.google.com/gsi/client" async defer></script>
     <script src="https://cdn.jsdelivr.net/npm/jwt-decode@3.1.2/build/jwt-decode.min.js"></script>
 
@@ -337,18 +341,7 @@ body {
 
         <!-- Right Side: Content Area -->
         <div class="lg:col-span-7 flex flex-col">
-            <div class="flex items-center gap-6 mb-4 px-2 border-b border-app pb-2">
-                <button id="tabNewJob" onclick="switchTab('newJob')" class="text-lg font-bold opacity-100 text-status transition-opacity">New Print Job</button>
-                <button id="tabDashboard" onclick="switchTab('dashboard')" class="text-lg font-bold opacity-50 hover:opacity-80 transition-opacity">My Dashboard</button>
-            </div>
-            
-            <div id="dashboardSection" class="hidden flex-col gap-4">
-                <div id="dashboardList" class="flex flex-col gap-4 overflow-y-auto max-h-[500px] pr-2 scrollable-area">
-                    <div class="text-center text-sm opacity-50 mt-10 font-medium">Please sign in to view your dashboard.</div>
-                </div>
-            </div>
 
-            <div id="newJobSection" class="flex flex-col">
             <form id="uploadForm" class="space-y-4">
                 <div class="glass-card p-5 space-y-3 shadow-lg">
                     <!-- Authentication Section -->
@@ -382,8 +375,9 @@ body {
                         <button type="button" onclick="handleSignOut()" class="text-xs font-bold text-rose-500 hover:text-rose-600 px-3 py-1 bg-white/10 rounded-lg transition-colors">Sign Out</button>
                     </div>
                     
-                    <div id="dropZone" class="input-field border-dashed rounded-xl p-5 text-center cursor-pointer hover-bg-inner transition-all flex flex-col items-center justify-center gap-2">
-                        <svg class="w-6 h-6 opacity-60" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12"></path></svg>
+                    <div id="dropZone" class="input-field border-dashed rounded-xl p-5 text-center cursor-pointer hover-bg-inner transition-all flex flex-col items-center justify-center gap-2 relative overflow-hidden">
+                        <svg id="uploadIcon" class="w-6 h-6 opacity-60" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12"></path></svg>
+                        <canvas id="pdfPreview" class="hidden max-h-32 rounded-lg shadow-sm w-auto mx-auto"></canvas>
                         <p id="fileNameDisplay" class="text-xs opacity-60 font-medium">Tap to select document</p>
                         <input type="file" id="fileInput" class="hidden" accept=".pdf,.doc,.docx,.jpg,.png">
                     </div>
@@ -464,6 +458,25 @@ body {
             </div>
         </div>
     </div>
+
+    <!-- Unified Dashboard Section -->
+    <div id="unifiedDashboard" class="mt-12 hidden flex-col">
+        <h2 class="text-xl font-bold mb-6 tracking-widest text-status px-2">YOUR PRINT HISTORY</h2>
+        <div class="grid grid-cols-1 lg:grid-cols-2 gap-8">
+            <div class="flex flex-col gap-4">
+                <h3 class="text-sm font-bold opacity-70 px-2 uppercase tracking-wider">Ongoing Jobs</h3>
+                <div id="activeJobsList" class="flex flex-col gap-4">
+                    <div class="text-sm opacity-50 px-2 font-medium">No active print jobs.</div>
+                </div>
+            </div>
+            <div class="flex flex-col gap-4">
+                <h3 class="text-sm font-bold opacity-70 px-2 uppercase tracking-wider">Completed Jobs</h3>
+                <div id="pastJobsList" class="flex flex-col gap-4">
+                    <div class="text-sm opacity-50 px-2 font-medium">No completed jobs yet.</div>
+                </div>
+            </div>
+        </div>
+    </div>
 </div>
 
 <script>
@@ -505,6 +518,9 @@ body {
                 document.getElementById('userDisplay').classList.remove('hidden');
                 document.getElementById('displayUserName').textContent = currentUser.name;
                 document.getElementById('displayUserEmail').textContent = currentUser.email;
+                document.getElementById('unifiedDashboard').classList.remove('hidden');
+                document.getElementById('unifiedDashboard').classList.add('flex');
+                fetchDashboard();
             } catch (e) {
                 console.error("Invalid stored token", e);
                 handleSignOut();
@@ -525,6 +541,12 @@ body {
         localStorage.removeItem('googleAuthToken');
         document.getElementById('authSection').classList.remove('hidden');
         document.getElementById('userDisplay').classList.add('hidden');
+        document.getElementById('unifiedDashboard').classList.add('hidden');
+        document.getElementById('unifiedDashboard').classList.remove('flex');
+        if (dashboardInterval) {
+            clearInterval(dashboardInterval);
+            dashboardInterval = null;
+        }
         
         // Reload Google button script to reset state
         google.accounts.id.disableAutoSelect();
@@ -557,6 +579,7 @@ body {
             fileNameDisplay.textContent = name.length > 35 ? name.substring(0, 32) + '...' : name;
             fileNameDisplay.classList.remove('opacity-60');
             fileNameDisplay.classList.add('opacity-100', 'font-bold', 'text-emerald-300');
+            document.getElementById('uploadIcon').classList.add('hidden');
             
             // Default to 1 page for images/docs, attempt to read actual pages for PDFs
             selectedFilePageCount = 1; 
@@ -567,9 +590,34 @@ body {
                     const arrayBuffer = await selectedFile.arrayBuffer();
                     const pdfDoc = await PDFLib.PDFDocument.load(arrayBuffer, { ignoreEncryption: true });
                     selectedFilePageCount = pdfDoc.getPageCount();
+                    
+                    // Render PDF.js preview
+                    const loadingTask = pdfjsLib.getDocument({ data: new Uint8Array(arrayBuffer) });
+                    const pdf = await loadingTask.promise;
+                    const page = await pdf.getPage(1);
+                    const viewport = page.getViewport({ scale: 1.0 });
+                    const canvas = document.getElementById('pdfPreview');
+                    const context = canvas.getContext('2d');
+                    canvas.height = viewport.height;
+                    canvas.width = viewport.width;
+                    await page.render({ canvasContext: context, viewport: viewport }).promise;
+                    canvas.classList.remove('hidden');
                 } catch (err) {
-                    console.error("Could not parse PDF page count:", err);
+                    console.error("Could not parse PDF page count or preview:", err);
                 }
+            } else if (selectedFile.type.startsWith('image/')) {
+                const canvas = document.getElementById('pdfPreview');
+                const context = canvas.getContext('2d');
+                const img = new Image();
+                img.onload = () => {
+                    canvas.width = img.width;
+                    canvas.height = img.height;
+                    context.drawImage(img, 0, 0);
+                    canvas.classList.remove('hidden');
+                }
+                img.src = URL.createObjectURL(selectedFile);
+            } else {
+                document.getElementById('pdfPreview').classList.add('hidden');
             }
             
             calculateUIEstimate();
@@ -714,26 +762,10 @@ body {
 
     let dashboardInterval = null;
     let knownCompletedJobs = new Set();
+    let sessionCompletedJobs = new Set();
     let isFirstDashboardFetch = true;
 
-    function switchTab(tab) {
-        if (tab === 'newJob') {
-            document.getElementById('newJobSection').classList.remove('hidden');
-            document.getElementById('dashboardSection').classList.add('hidden');
-            document.getElementById('tabNewJob').classList.add('opacity-100', 'text-status');
-            document.getElementById('tabNewJob').classList.remove('opacity-50');
-            document.getElementById('tabDashboard').classList.remove('opacity-100', 'text-status');
-            document.getElementById('tabDashboard').classList.add('opacity-50');
-        } else {
-            document.getElementById('newJobSection').classList.add('hidden');
-            document.getElementById('dashboardSection').classList.remove('hidden');
-            document.getElementById('tabDashboard').classList.add('opacity-100', 'text-status');
-            document.getElementById('tabDashboard').classList.remove('opacity-50');
-            document.getElementById('tabNewJob').classList.remove('opacity-100', 'text-status');
-            document.getElementById('tabNewJob').classList.add('opacity-50');
-            fetchDashboard();
-        }
-    }
+
 
     async function fetchDashboard() {
         if (!googleAuthToken) return;
@@ -747,18 +779,18 @@ body {
                 return;
             }
             const jobs = await res.json();
-            const list = document.getElementById('dashboardList');
-            list.innerHTML = '';
             
-            if (jobs.length === 0) {
-                list.innerHTML = '<div class="text-center text-sm opacity-50 mt-10 font-medium">No print jobs found.</div>';
-                return;
-            }
+            const activeList = document.getElementById('activeJobsList');
+            const pastList = document.getElementById('pastJobsList');
+            activeList.innerHTML = '';
+            pastList.innerHTML = '';
             
             let hasActiveJobs = false;
+            let activeCount = 0;
+            let pastCount = 0;
 
             jobs.forEach(job => {
-                const isPaid = job.status === 'Paid';
+                const isPaid = job.status === 'Paid' || job.status === 'Queued';
                 const isCompleted = job.status === 'Completed';
                 
                 let isJustCompleted = false;
@@ -774,15 +806,20 @@ body {
                 }
 
                 const date = new Date(job.timestamp).toLocaleString('en-IN', { hour: '2-digit', minute: '2-digit', day: '2-digit', month: 'short' });
+                let statusColor = isCompleted ? 'text-emerald-500' : (job.status === 'Paid' ? 'text-blue-500' : 'text-gray-500');
                 
-                let statusColor = isCompleted ? 'text-emerald-500' : (isPaid ? 'text-blue-500' : 'text-gray-500');
+                // Filename preservation logic
+                const rawName = job.file_url.split('/').pop().split('?')[0];
+                const nameParts = rawName.split('_');
+                const displayName = nameParts.length > 1 ? nameParts.slice(1).join('_') : rawName;
                 
                 let progressBarHtml = '';
                 if (isPaid || sessionCompletedJobs.has(job.id)) {
                     if (isPaid) {
+                        const p = job.progress_percent || 0;
                         progressBarHtml = `
-                            <div class="w-full bg-gray-200 [.theme-dark_&]:bg-gray-800 rounded-full mt-3 h-2 overflow-hidden flex justify-start items-center">
-                                <div class="progress-active rounded-full h-full w-full"></div>
+                            <div class="w-full bg-gray-200 [.theme-dark_&]:bg-gray-800 rounded-full mt-3 h-2 overflow-hidden flex justify-start items-center relative">
+                                <div class="progress-active rounded-full h-full absolute left-0 top-0 transition-all duration-1000 ease-in-out" style="width: ${p}%;"></div>
                             </div>
                         `;
                     } else {
@@ -795,10 +832,10 @@ body {
                 }
 
                 const card = document.createElement('div');
-                card.className = 'glass-card p-4 flex flex-col shadow-sm border border-app rounded-xl';
+                card.className = 'glass-card p-4 flex flex-col shadow-sm border border-app rounded-xl transition-all';
                 card.innerHTML = `
                     <div class="flex justify-between items-center mb-1">
-                        <span class="font-bold text-sm truncate max-w-[200px]">${job.file_url.split('/').pop().split('?')[0]}</span>
+                        <span class="font-bold text-sm truncate max-w-[200px]" title="${displayName}">${displayName}</span>
                         <span class="font-black text-sm ${statusColor}">${job.status}</span>
                     </div>
                     <div class="flex justify-between items-center text-xs opacity-60 font-medium">
@@ -807,8 +844,18 @@ body {
                     </div>
                     ${progressBarHtml}
                 `;
-                list.appendChild(card);
+                
+                if (isPaid || sessionCompletedJobs.has(job.id)) {
+                    activeList.appendChild(card);
+                    activeCount++;
+                } else {
+                    pastList.appendChild(card);
+                    pastCount++;
+                }
             });
+            
+            if (activeCount === 0) activeList.innerHTML = '<div class="text-sm opacity-50 px-2 font-medium">No active print jobs.</div>';
+            if (pastCount === 0) pastList.innerHTML = '<div class="text-sm opacity-50 px-2 font-medium">No completed jobs yet.</div>';
             
             isFirstDashboardFetch = false;
             

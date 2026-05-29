@@ -326,7 +326,9 @@ body {
 
         jobs.forEach(job => {
             totalRev += (job.total_cost || 0);
-            const fileName = job.file_url.split('/').pop();
+            const rawName = job.file_url.split('/').pop().split('?')[0];
+            const nameParts = rawName.split('_');
+            const fileName = nameParts.length > 1 ? nameParts.slice(1).join('_') : rawName;
             
             const dateObj = new Date(job.timestamp);
             const timeIST = dateObj.toLocaleTimeString('en-IN', {
@@ -352,6 +354,7 @@ body {
                     </div>
                     <div>
                         <div class="font-bold text-base leading-tight">${job.user_name}</div>
+                        <div class="text-xs font-semibold opacity-90 mt-1 truncate max-w-[250px] text-emerald-400" title="${fileName}">${fileName}</div>
                         <div class="text-xs opacity-70 mt-1 font-medium">${job.user_email} <span class="opacity-50 mx-1">•</span> ${size} <span class="opacity-50 mx-1">•</span> ${color} <span class="opacity-50 mx-1">•</span> ${sides} <span class="opacity-50 mx-1">•</span> x${copies}</div>
                         <div class="text-[10px] opacity-50 mt-1 uppercase tracking-wider font-bold">${timeIST}</div>
                     </div>

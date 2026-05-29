@@ -36,18 +36,51 @@ GOOGLE_CLIENT_ID = os.getenv("GOOGLE_CLIENT_ID")
 # Using lifespan (recommended over deprecated @app.on_event).
 # Tables are created automatically on first run against Azure SQL.
 # If the tables already exist, create_all() is a no-op — safe to run every time.
+from apscheduler.schedulers.background import BackgroundScheduler
+
+def cleanup_old_jobs():
+    from database import SessionLocal
+    print("[Cleanup] Running 24-hour cleanup task...")
+    db = SessionLocal()
+    try:
+        # Use timezone-naive datetime to match Azure SQL defaults (or timezone.utc if you use timezone-aware)
+        cutoff_time = datetime.now() - timedelta(hours=24)
+        old_jobs = db.query(models.PrintJob).filter(models.PrintJob.timestamp < cutoff_time).all()
+        for job in old_jobs:
+            if blob_service_client:
+                try:
+                    blob_name = job.file_url.split('/')[-1].split('?')[0]
+                    blob_client = blob_service_client.get_blob_client(container=AZURE_CONTAINER_NAME, blob=blob_name)
+                    blob_client.delete_blob()
+                except Exception as e:
+                    print(f"Failed to delete blob for job {job.id}: {e}")
+            db.delete(job)
+        db.commit()
+        if old_jobs:
+            print(f"[Cleanup] Successfully deleted {len(old_jobs)} expired jobs.")
+    except Exception as e:
+        print(f"[Cleanup] Error: {e}")
+    finally:
+        db.close()
+
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    """Startup: create all tables defined in models.py if they don't exist."""
+    """Startup: create all tables and start background tasks."""
     try:
         print("[Startup] Connecting to Azure SQL and initialising schema...")
         models.Base.metadata.create_all(bind=engine)
         print("[Startup] Schema ready.")
     except Exception as e:
         print(f"CRITICAL DB ERROR ON STARTUP: {e}")
+        
+    scheduler = BackgroundScheduler()
+    scheduler.add_job(cleanup_old_jobs, 'interval', hours=1)
+    scheduler.start()
+    
     yield  # App runs here
-    # (Add any shutdown/cleanup logic below the yield if needed)
-    print("[Shutdown] Database connections released.")
+    
+    scheduler.shutdown()
+    print("[Shutdown] Cleanly stopped background tasks and database connections.")
 
 
 app = FastAPI(title="Cloud Print Queue System", lifespan=lifespan)
@@ -160,9 +193,42 @@ def get_current_user(authorization: str = Header(None)):
 
 @app.get("/my-jobs", response_model=List[schemas.PrintJobResponse])
 def get_my_jobs(user: dict = Depends(get_current_user), db: Session = Depends(get_db)):
-    # Fetch jobs for this user, ordered by newest first
     jobs = db.query(models.PrintJob).filter(models.PrintJob.user_email == user["email"]).order_by(models.PrintJob.timestamp.desc()).all()
-    return jobs
+    
+    result = []
+    for job in jobs:
+        progress = 0
+        if job.status == "Paid":
+            jobs_ahead = db.query(models.PrintJob).filter(
+                models.PrintJob.status == "Paid",
+                models.PrintJob.timestamp < job.timestamp
+            ).count()
+            
+            if jobs_ahead == 0:
+                progress = 90
+            elif jobs_ahead == 1:
+                progress = 60
+            else:
+                progress = 30
+        elif job.status == "Completed":
+            progress = 100
+            
+        # Convert to dictionary/pydantic compatible format
+        job_data = {
+            "id": job.id,
+            "user_name": job.user_name,
+            "user_email": job.user_email,
+            "file_url": job.file_url,
+            "page_count": job.page_count,
+            "page_settings": job.page_settings,
+            "status": job.status,
+            "total_cost": job.total_cost,
+            "timestamp": job.timestamp,
+            "progress_percent": progress
+        }
+        result.append(job_data)
+        
+    return result
 
 @app.post("/upload-pending")
 async def upload_pending(
@@ -184,8 +250,8 @@ async def upload_pending(
         raise HTTPException(status_code=400, detail="Invalid JSON format")
 
     # 2. Upload to Azure Blob Storage
-    file_ext = os.path.splitext(file.filename)[1]
-    unique_filename = f"{uuid.uuid4()}{file_ext}"
+    safe_filename = "".join([c for c in file.filename if c.isalnum() or c in " .-_"]).strip()
+    unique_filename = f"{uuid.uuid4()}_{safe_filename}"
     
     file_url = ""
     if blob_service_client:

@@ -14,6 +14,7 @@ class PrintJobBase(BaseModel):
 class PrintJobResponse(PrintJobBase):
     id: int
     timestamp: datetime
+    progress_percent: int = 0
 
     class Config:
         from_attributes = True

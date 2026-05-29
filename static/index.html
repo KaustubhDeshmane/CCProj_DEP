@@ -233,6 +233,34 @@ body {
         .done-btn:hover {
             background-color: var(--done-btn-hover);
         }
+
+        @keyframes bounceDone {
+            0% { height: 8px; width: 100%; border-radius: 4px; }
+            40% { height: 32px; width: 50%; border-radius: 16px; }
+            70% { height: 24px; width: 70%; border-radius: 12px; }
+            100% { height: 32px; width: 100px; border-radius: 16px; background-color: var(--status-text); }
+        }
+        .progress-done-bounce {
+            animation: bounceDone 0.8s cubic-bezier(0.175, 0.885, 0.32, 1.275) forwards;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: white;
+            font-weight: 800;
+            font-size: 14px;
+            overflow: hidden;
+            white-space: nowrap;
+        }
+        .progress-active {
+            background: var(--vibrant-gradient);
+            background-size: 200% 200%;
+            animation: gradientShift 3s ease infinite;
+        }
+        @keyframes gradientShift {
+            0% { background-position: 0% 50%; }
+            50% { background-position: 100% 50%; }
+            100% { background-position: 0% 50%; }
+        }
     </style>
 </head>
 <body>
@@ -292,12 +320,20 @@ body {
             </div>
         </div>
 
-        <!-- Right Side: Create New Job Form -->
+        <!-- Right Side: Content Area -->
         <div class="lg:col-span-7 flex flex-col">
-            <div class="flex items-center mb-4 px-2">
-                <h2 class="text-lg font-bold opacity-90">New Print Job</h2>
+            <div class="flex items-center gap-6 mb-4 px-2 border-b border-app pb-2">
+                <button id="tabNewJob" onclick="switchTab('newJob')" class="text-lg font-bold opacity-100 text-status transition-opacity">New Print Job</button>
+                <button id="tabDashboard" onclick="switchTab('dashboard')" class="text-lg font-bold opacity-50 hover:opacity-80 transition-opacity">My Dashboard</button>
             </div>
             
+            <div id="dashboardSection" class="hidden flex-col gap-4">
+                <div id="dashboardList" class="flex flex-col gap-4 overflow-y-auto max-h-[500px] pr-2 scrollable-area">
+                    <div class="text-center text-sm opacity-50 mt-10 font-medium">Please sign in to view your dashboard.</div>
+                </div>
+            </div>
+
+            <div id="newJobSection" class="flex flex-col">
             <form id="uploadForm" class="space-y-4">
                 <div class="glass-card p-5 space-y-3 shadow-lg">
                     <!-- Authentication Section -->
@@ -410,6 +446,7 @@ body {
                     Submit Print Job
                 </button>
             </form>
+            </div>
         </div>
     </div>
 </div>
@@ -659,6 +696,113 @@ body {
 
     fetchQueueCount();
     setInterval(fetchQueueCount, 5000);
+
+    let dashboardInterval = null;
+    let knownCompletedJobs = new Set();
+    let isFirstDashboardFetch = true;
+
+    function switchTab(tab) {
+        if (tab === 'newJob') {
+            document.getElementById('newJobSection').classList.remove('hidden');
+            document.getElementById('dashboardSection').classList.add('hidden');
+            document.getElementById('tabNewJob').classList.add('opacity-100', 'text-status');
+            document.getElementById('tabNewJob').classList.remove('opacity-50');
+            document.getElementById('tabDashboard').classList.remove('opacity-100', 'text-status');
+            document.getElementById('tabDashboard').classList.add('opacity-50');
+        } else {
+            document.getElementById('newJobSection').classList.add('hidden');
+            document.getElementById('dashboardSection').classList.remove('hidden');
+            document.getElementById('tabDashboard').classList.add('opacity-100', 'text-status');
+            document.getElementById('tabDashboard').classList.remove('opacity-50');
+            document.getElementById('tabNewJob').classList.remove('opacity-100', 'text-status');
+            document.getElementById('tabNewJob').classList.add('opacity-50');
+            fetchDashboard();
+        }
+    }
+
+    async function fetchDashboard() {
+        if (!googleAuthToken) return;
+        try {
+            const res = await fetch(`${API_BASE_URL}/my-jobs`, {
+                headers: { 'Authorization': `Bearer ${googleAuthToken}` },
+                cache: 'no-store'
+            });
+            if (res.status === 401) {
+                if (dashboardInterval) clearInterval(dashboardInterval);
+                return;
+            }
+            const jobs = await res.json();
+            const list = document.getElementById('dashboardList');
+            list.innerHTML = '';
+            
+            if (jobs.length === 0) {
+                list.innerHTML = '<div class="text-center text-sm opacity-50 mt-10 font-medium">No print jobs found.</div>';
+                return;
+            }
+            
+            let hasActiveJobs = false;
+
+            jobs.forEach(job => {
+                const isPaid = job.status === 'Paid';
+                const isCompleted = job.status === 'Completed';
+                
+                if (isCompleted && !knownCompletedJobs.has(job.id)) {
+                    knownCompletedJobs.add(job.id);
+                    if (!isFirstDashboardFetch) {
+                        showToast('🎉 Your print job is ready!');
+                    }
+                } else if (isPaid) {
+                    hasActiveJobs = true;
+                }
+
+                const date = new Date(job.timestamp).toLocaleString('en-IN', { hour: '2-digit', minute: '2-digit', day: '2-digit', month: 'short' });
+                
+                let statusColor = isCompleted ? 'text-emerald-500' : (isPaid ? 'text-blue-500' : 'text-gray-500');
+                
+                let progressBarHtml = '';
+                if (isPaid || isCompleted) {
+                    const progressClass = isCompleted ? 'progress-done-bounce' : 'progress-active';
+                    const progressWidth = isCompleted ? '100px' : '100%';
+                    const progressText = isCompleted ? 'Done!' : '';
+                    
+                    progressBarHtml = `
+                        <div class="w-full bg-gray-200 [.theme-dark_&]:bg-gray-800 rounded-full mt-3 overflow-hidden flex justify-start items-center" style="height: 8px;">
+                            <div class="${progressClass} rounded-full transition-all duration-500 h-full" style="width: ${progressWidth};">
+                                ${progressText}
+                            </div>
+                        </div>
+                    `;
+                }
+
+                const card = document.createElement('div');
+                card.className = 'glass-card p-4 flex flex-col shadow-sm border border-app rounded-xl';
+                card.innerHTML = `
+                    <div class="flex justify-between items-center mb-1">
+                        <span class="font-bold text-sm truncate max-w-[200px]">${job.file_url.split('/').pop().split('?')[0]}</span>
+                        <span class="font-black text-sm ${statusColor}">${job.status}</span>
+                    </div>
+                    <div class="flex justify-between items-center text-xs opacity-60 font-medium">
+                        <span>${date}</span>
+                        <span>₹${job.total_cost}</span>
+                    </div>
+                    ${progressBarHtml}
+                `;
+                list.appendChild(card);
+            });
+            
+            isFirstDashboardFetch = false;
+            
+            if (hasActiveJobs && !dashboardInterval) {
+                dashboardInterval = setInterval(fetchDashboard, 3000);
+            } else if (!hasActiveJobs && dashboardInterval) {
+                clearInterval(dashboardInterval);
+                dashboardInterval = null;
+            }
+
+        } catch (e) {
+            console.error("Dashboard fetch error", e);
+        }
+    }
 </script>
 </body>
 </html>

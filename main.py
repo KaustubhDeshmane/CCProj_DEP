@@ -137,15 +137,7 @@ def home():
 def admin_page():
     return FileResponse("static/admin.html")
 
-@app.post("/upload-pending")
-async def upload_pending(
-    request: Request,
-    authorization: str = Header(None),
-    settings: str = Form(...),
-    file: UploadFile = File(...),
-    db: Session = Depends(get_db)
-):
-    # 0. Verify Google Authentication
+def get_current_user(authorization: str = Header(None)):
     if not authorization or not authorization.startswith("Bearer "):
         raise HTTPException(status_code=401, detail="Unauthorized: Missing or invalid token")
         
@@ -157,16 +149,31 @@ async def upload_pending(
             user_name = idinfo.get("name", "Unknown User")
             user_email = idinfo.get("email", "Unknown Email")
             
-            # Strict Domain Verification
             if not user_email.endswith("@dbit.in"):
                 raise HTTPException(status_code=403, detail="Forbidden: Only @dbit.in college emails are allowed")
+            return {"name": user_name, "email": user_email}
         else:
-            # Fallback for local testing if no client ID is set (Not secure for production)
             print("WARNING: GOOGLE_CLIENT_ID not set. Skipping verification for dev mode.")
-            user_name = "Dev User"
-            user_email = "dev@example.com"
+            return {"name": "Dev User", "email": "dev@example.com"}
     except ValueError:
         raise HTTPException(status_code=401, detail="Unauthorized: Invalid token")
+
+@app.get("/my-jobs", response_model=List[schemas.PrintJobResponse])
+def get_my_jobs(user: dict = Depends(get_current_user), db: Session = Depends(get_db)):
+    # Fetch jobs for this user, ordered by newest first
+    jobs = db.query(models.PrintJob).filter(models.PrintJob.user_email == user["email"]).order_by(models.PrintJob.timestamp.desc()).all()
+    return jobs
+
+@app.post("/upload-pending")
+async def upload_pending(
+    request: Request,
+    user: dict = Depends(get_current_user),
+    settings: str = Form(...),
+    file: UploadFile = File(...),
+    db: Session = Depends(get_db)
+):
+    user_name = user["name"]
+    user_email = user["email"]
 
     # 1. Parse JSON settings
     try:

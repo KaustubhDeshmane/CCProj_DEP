@@ -427,15 +427,21 @@ async def payment_callback(transactionId: str = Form(...), code: str = Form(...)
         jobs = db.query(models.PrintJob).filter(models.PrintJob.transaction_id == txn_id).all()
         
         if status_data.get("success") and status_data.get("code") == "PAYMENT_SUCCESS":
+            updated = False
             for job in jobs:
-                job.status = "Paid"
-            if jobs:
+                if job.status not in ["Paid", "Completed"]:
+                    job.status = "Paid"
+                    updated = True
+            if updated:
                 db.commit()
             return RedirectResponse(url=f"/?success=true", status_code=303)
         else:
+            updated = False
             for job in jobs:
-                job.status = "Failed"
-            if jobs:
+                if job.status not in ["Paid", "Completed"]:
+                    job.status = "Failed"
+                    updated = True
+            if updated:
                 db.commit()
             return RedirectResponse(url="/?success=false&reason=Payment_Failed", status_code=303)
     except Exception as e:

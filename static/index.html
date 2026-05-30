@@ -497,17 +497,26 @@ body {
     </div> <!-- End of Grid -->
 
     <!-- Unified Dashboard Section -->
-    <div id="unifiedDashboard" class="mt-12 hidden flex-col w-full">
+    <div id="unifiedDashboard" class="mt-12 hidden flex-col w-full bg-black/5 [.theme-dark_&]:bg-black/40 rounded-3xl p-6 shadow-inner border border-black/5 [.theme-dark_&]:border-white/5">
         <h2 class="text-xl font-bold mb-6 tracking-widest text-status px-2">YOUR PRINT HISTORY</h2>
-        <div class="grid grid-cols-1 lg:grid-cols-2 gap-8 w-full">
-            <div class="flex flex-col gap-4">
-                <h3 class="text-sm font-bold opacity-70 px-2 uppercase tracking-wider">Ongoing Jobs</h3>
+        
+        <!-- Tabs Header -->
+        <div class="flex gap-6 mb-6 px-2 border-b border-black/10 [.theme-dark_&]:border-white/10">
+            <button id="tabOngoing" onclick="switchTab('ongoing')" class="pb-3 text-sm font-bold uppercase tracking-wider text-emerald-500 border-b-2 border-emerald-500 transition-all">Ongoing Jobs</button>
+            <button id="tabCompleted" onclick="switchTab('completed')" class="pb-3 text-sm font-bold uppercase tracking-wider opacity-50 hover:opacity-100 transition-all border-b-2 border-transparent">Completed Jobs</button>
+        </div>
+
+        <!-- Tab Contents -->
+        <div class="w-full">
+            <!-- Ongoing Tab -->
+            <div id="contentOngoing" class="w-full flex flex-col gap-4">
                 <div id="activeJobsList" class="flex flex-col gap-4">
                     <div class="text-sm opacity-50 px-2 font-medium">No active print jobs.</div>
                 </div>
             </div>
-            <div class="flex flex-col gap-4">
-                <h3 class="text-sm font-bold opacity-70 px-2 uppercase tracking-wider">Completed Jobs</h3>
+            
+            <!-- Completed Tab -->
+            <div id="contentCompleted" class="w-full flex flex-col gap-4 hidden">
                 <div id="pastJobsList" class="flex flex-col gap-4">
                     <div class="text-sm opacity-50 px-2 font-medium">No completed jobs yet.</div>
                 </div>
@@ -542,6 +551,25 @@ body {
 
     let googleAuthToken = localStorage.getItem('googleAuthToken');
     let currentUser = null;
+
+    function switchTab(tab) {
+        const tOngoing = document.getElementById('tabOngoing');
+        const tCompleted = document.getElementById('tabCompleted');
+        const cOngoing = document.getElementById('contentOngoing');
+        const cCompleted = document.getElementById('contentCompleted');
+
+        if (tab === 'ongoing') {
+            tOngoing.className = "pb-3 text-sm font-bold uppercase tracking-wider text-emerald-500 border-b-2 border-emerald-500 transition-all";
+            tCompleted.className = "pb-3 text-sm font-bold uppercase tracking-wider opacity-50 hover:opacity-100 transition-all border-b-2 border-transparent";
+            cOngoing.classList.remove('hidden');
+            cCompleted.classList.add('hidden');
+        } else {
+            tCompleted.className = "pb-3 text-sm font-bold uppercase tracking-wider text-emerald-500 border-b-2 border-emerald-500 transition-all";
+            tOngoing.className = "pb-3 text-sm font-bold uppercase tracking-wider opacity-50 hover:opacity-100 transition-all border-b-2 border-transparent";
+            cCompleted.classList.remove('hidden');
+            cOngoing.classList.add('hidden');
+        }
+    }
 
     function showToast(message) {
         let container = document.getElementById('toast-container');

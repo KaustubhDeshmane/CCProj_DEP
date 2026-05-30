@@ -497,13 +497,13 @@ body {
     </div> <!-- End of Grid -->
 
     <!-- Unified Dashboard Section -->
-    <div id="unifiedDashboard" class="mt-12 hidden flex-col bg-black/[0.04] [.theme-dark_&]:bg-black/40 shadow-[inset_0_30px_60px_-15px_rgba(0,0,0,0.2)] [.theme-dark_&]:shadow-[inset_0_40px_80px_-20px_rgba(0,0,0,0.7)] border-t border-black/5 [.theme-dark_&]:border-white/5 -mx-5 -mb-6 lg:-mx-10 lg:-mb-8 p-6 lg:p-10 pt-10">
+    <div id="unifiedDashboard" class="mt-12 hidden flex-col bg-white/60 [.theme-dark_&]:bg-white/5 shadow-[inset_0_30px_60px_-15px_rgba(0,0,0,0.1)] [.theme-dark_&]:shadow-[inset_0_40px_80px_-20px_rgba(0,0,0,0.5)] border-t border-white/50 [.theme-dark_&]:border-white/10 -mx-5 -mb-6 lg:-mx-10 lg:-mb-8 p-6 lg:p-10 pt-10 rounded-t-[2.5rem]">
         <h2 class="text-xl font-bold mb-6 tracking-widest text-status px-2">YOUR PRINT HISTORY</h2>
         
         <!-- Tabs Header -->
         <div class="flex gap-6 mb-6 px-2 border-b border-black/10 [.theme-dark_&]:border-white/10">
-            <button id="tabOngoing" onclick="switchTab('ongoing')" class="pb-3 text-sm font-bold uppercase tracking-wider text-emerald-500 border-b-2 border-emerald-500 transition-all">Ongoing Jobs</button>
-            <button id="tabCompleted" onclick="switchTab('completed')" class="pb-3 text-sm font-bold uppercase tracking-wider opacity-50 hover:opacity-100 transition-all border-b-2 border-transparent">Completed Jobs</button>
+            <button id="tabOngoing" onclick="switchTab('ongoing')" class="pb-3 text-sm font-bold uppercase tracking-wider text-emerald-500 border-b-2 border-emerald-500 transition-all duration-500 ease-out transform -translate-y-[2px] drop-shadow-[0_0_8px_rgba(16,185,129,0.6)]">Ongoing Jobs</button>
+            <button id="tabCompleted" onclick="switchTab('completed')" class="pb-3 text-sm font-bold uppercase tracking-wider opacity-50 hover:opacity-100 transition-all duration-500 ease-out border-b-2 border-transparent transform translate-y-0">Completed Jobs</button>
         </div>
 
         <!-- Tab Contents -->
@@ -557,15 +557,18 @@ body {
         const tCompleted = document.getElementById('tabCompleted');
         const cOngoing = document.getElementById('contentOngoing');
         const cCompleted = document.getElementById('contentCompleted');
+        
+        const activeClass = "pb-3 text-sm font-bold uppercase tracking-wider text-emerald-500 border-b-2 border-emerald-500 transition-all duration-500 ease-out transform -translate-y-[2px] drop-shadow-[0_0_8px_rgba(16,185,129,0.6)]";
+        const inactiveClass = "pb-3 text-sm font-bold uppercase tracking-wider opacity-50 hover:opacity-100 transition-all duration-500 ease-out border-b-2 border-transparent transform translate-y-0";
 
         if (tab === 'ongoing') {
-            tOngoing.className = "pb-3 text-sm font-bold uppercase tracking-wider text-emerald-500 border-b-2 border-emerald-500 transition-all";
-            tCompleted.className = "pb-3 text-sm font-bold uppercase tracking-wider opacity-50 hover:opacity-100 transition-all border-b-2 border-transparent";
+            tOngoing.className = activeClass;
+            tCompleted.className = inactiveClass;
             cOngoing.classList.remove('hidden');
             cCompleted.classList.add('hidden');
         } else {
-            tCompleted.className = "pb-3 text-sm font-bold uppercase tracking-wider text-emerald-500 border-b-2 border-emerald-500 transition-all";
-            tOngoing.className = "pb-3 text-sm font-bold uppercase tracking-wider opacity-50 hover:opacity-100 transition-all border-b-2 border-transparent";
+            tCompleted.className = activeClass;
+            tOngoing.className = inactiveClass;
             cCompleted.classList.remove('hidden');
             cOngoing.classList.add('hidden');
         }
